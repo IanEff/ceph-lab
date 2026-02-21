@@ -28,6 +28,7 @@
 ## Prune / SelfHeal Defaults
 
 For new infra components, use:
+
 ```json
 "prune": true,
 "selfHeal": true
@@ -38,6 +39,7 @@ Only set `prune: false` for operators whose deletion would orphan CRDs or custom
 ## How Waves Are Applied
 
 The `infra-set.yaml` `ApplicationSet` injects the `syncWave` annotation from `config.json` into each generated `Application`:
+
 ```yaml
 metadata:
   annotations:
