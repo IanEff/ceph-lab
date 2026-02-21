@@ -19,6 +19,13 @@ GITOPS_REPO_TOKEN="${GITOPS_REPO_TOKEN:-}"
 GITOPS_SSH_KEY_PATH="${GITOPS_SSH_KEY_PATH:-}"
 ARGOCD_VERSION="${ARGOCD_VERSION:-stable}"
 
+# Auto-detect the deploy key when it exists at the conventional location
+# and no SSH key path was explicitly configured.
+if [ -z "$GITOPS_SSH_KEY_PATH" ] && [ -f "/vagrant/deploy_ceph-lab" ]; then
+    GITOPS_SSH_KEY_PATH="deploy_ceph-lab"
+    echo "  Auto-detected deploy key at /vagrant/deploy_ceph-lab"
+fi
+
 if [ -z "$GITOPS_REPO_URL" ]; then
     echo "ERROR: GITOPS_REPO_URL is not set. Set it in .env before running."
     echo "  Example: GITOPS_REPO_URL=https://github.com/YOUR_USERNAME/ceph-lab.git"

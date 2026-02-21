@@ -250,7 +250,7 @@ TMUX
 
 chown vagrant:vagrant /home/vagrant/.vimrc /home/vagrant/.tmux.conf /home/vagrant/.bashrc
 
-echo "[11] Install VirtualBox Guest Additions 7.2.4"
+echo "[11] VirtualBox Guest Additions + /vagrant shared folder"
 if ! lsmod | grep -q vboxguest 2>/dev/null; then
     VBOX_ISO="/tmp/VBoxGuestAdditions.iso"
     curl -fsSL -o "$VBOX_ISO" \
@@ -261,12 +261,18 @@ if ! lsmod | grep -q vboxguest 2>/dev/null; then
     /mnt/vbox-iso/VBoxLinuxAdditions.run --nox11 || true
     umount /mnt/vbox-iso
     rm -f "$VBOX_ISO"
-    # Mount /vagrant shared folder
-    mkdir -p /vagrant
-    mount -t vboxsf vagrant /vagrant || true
-    echo "vboxsf" >> /etc/modules
-    grep -q 'vagrant.*vboxsf' /etc/fstab || \
-        echo "vagrant /vagrant vboxsf defaults,uid=1000,gid=1000 0 0" >> /etc/fstab
 fi
+
+# Always ensure /vagrant is mounted — the vboxguest module may have been
+# pre-loaded by the base box, bypassing the block above, but the shared
+# folder still needs to be explicitly mounted.
+if ! mountpoint -q /vagrant 2>/dev/null; then
+    mkdir -p /vagrant
+    modprobe vboxsf 2>/dev/null || true
+    mount -t vboxsf vagrant /vagrant || echo "[WARN] /vagrant mount failed — node-token sharing will not work"
+fi
+grep -q 'vboxsf' /etc/modules 2>/dev/null || echo "vboxsf" >> /etc/modules
+grep -q 'vagrant.*vboxsf' /etc/fstab || \
+    echo "vagrant /vagrant vboxsf defaults,uid=1000,gid=1000 0 0" >> /etc/fstab
 
 echo "✓ common.sh complete"
