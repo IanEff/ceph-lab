@@ -11,7 +11,7 @@ CONTROL_PLANE_IP="${SANDBOX_CONTROL_PLANE_IP:-192.168.56.50}"
 export KUBECONFIG=/root/.kube/config
 
 echo "[cilium] Gateway API CRDs (${GATEWAY_API_VERSION}) — must precede Cilium install"
-kubectl apply -f \
+kubectl apply --server-side -f \
     "https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/experimental-install.yaml"
 
 echo "[cilium] Waiting for Gateway API CRDs to be established..."

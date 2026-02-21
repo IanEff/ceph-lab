@@ -39,11 +39,11 @@ echo "════════════════════════�
 
 echo "[1] Install ArgoCD (${ARGOCD_VERSION})"
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -n argocd -f \
+kubectl apply --server-side -n argocd -f \
     "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
 
 echo "[2] Apply local bootstrap patches (insecure mode, kustomize-helm, bcrypt password)"
-kubectl apply -k /vagrant/cluster-bootstrap/argocd/
+kubectl apply --server-side -k /vagrant/cluster-bootstrap/argocd/
 
 echo "[3] Wait for ArgoCD server to be ready..."
 kubectl rollout status deployment/argocd-server -n argocd --timeout=5m
