@@ -1,0 +1,30 @@
+# Root Application — seeds the entire GitOps tree.
+# Applied by install_argocd.sh after substituting GITOPS_REPO_URL.
+#
+# This Application manages the ceph-lab cluster directory, which in turn
+# contains:
+#   - infra-set.yaml    (ApplicationSet for all infrastructure)
+#   - rook-*.yaml       (individual Applications for Rook Ceph components)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ceph-lab-root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: GITOPS_REPO_URL
+    targetRevision: HEAD
+    path: applications/clusters/ceph-lab
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

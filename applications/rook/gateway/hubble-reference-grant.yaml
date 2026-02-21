@@ -1,0 +1,17 @@
+---
+# ReferenceGrant — allows the Gateway in the cilium-gateway namespace to route
+# traffic to services in kube-system (e.g. hubble-ui).
+# Gateway API spec: cross-namespace references require explicit grants.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-gateway-to-kube-system
+  namespace: kube-system
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: kube-system
+  to:
+    - group: ""
+      kind: Service

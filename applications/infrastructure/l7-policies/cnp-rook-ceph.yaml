@@ -1,0 +1,82 @@
+# L7 visibility into the rook-ceph namespace.
+# Every flow through here will appear in Hubble with HTTP fields populated
+# on ports 80 (RGW), 7000 (dashboard), 9283/9926 (metrics).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: l7-visibility
+  namespace: rook-ceph
+spec:
+  endpointSelector: {}
+  ingress:
+    # HTTP: RGW S3, MGR dashboard, Prometheus metrics, Rook operator metrics
+    - fromEntities: [cluster]
+      toPorts:
+        - ports:
+            - { port: "80",   protocol: TCP }
+            - { port: "7000", protocol: TCP }
+            - { port: "9283", protocol: TCP }
+            - { port: "8080", protocol: TCP }
+            - { port: "2112", protocol: TCP }
+            - { port: "9926", protocol: TCP }
+          rules:
+            http: [{}]
+    # Rook operator webhook (TLS, L4 only)
+    - fromEntities: [kube-apiserver]
+      toPorts:
+        - ports:
+            - { port: "9443", protocol: TCP }
+    # Ceph MON (L4)
+    - fromEntities: [cluster]
+      toPorts:
+        - ports:
+            - { port: "3300", protocol: TCP }
+            - { port: "6789", protocol: TCP }
+    # Ceph OSD (L4)
+    - fromEntities: [cluster]
+      toPorts:
+        - ports:
+            - { port: "6800", protocol: TCP }
+            - { port: "6801", protocol: TCP }
+            - { port: "6802", protocol: TCP }
+            - { port: "6803", protocol: TCP }
+            - { port: "6804", protocol: TCP }
+            - { port: "6805", protocol: TCP }
+    # Ceph MDS (L4)
+    - fromEntities: [cluster]
+      toPorts:
+        - ports:
+            - { port: "6806", protocol: TCP }
+            - { port: "6807", protocol: TCP }
+            - { port: "6808", protocol: TCP }
+    # kubelet liveness probes
+    - fromEntities: [host, remote-node]
+      toPorts:
+        - ports:
+            - { port: "8090", protocol: TCP }
+            - { port: "9841", protocol: TCP }
+            - { port: "9842", protocol: TCP }
+  egress:
+    # DNS
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - { port: "53", protocol: UDP }
+            - { port: "53", protocol: TCP }
+          rules:
+            dns:
+              - matchPattern: "*"
+    # kube-apiserver
+    - toEntities: [kube-apiserver]
+    # Intra-namespace (all Ceph daemon-to-daemon traffic)
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: rook-ceph
+    # External HTTPS for image pulls etc.
+    - toEntities: [world]
+      toPorts:
+        - ports:
+            - { port: "443", protocol: TCP }

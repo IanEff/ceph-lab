@@ -1,0 +1,100 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+# Generates a cluster-config ConfigMap from gitops.env.
+# Infrastructure apps include this Component to access cluster-wide values.
+configMapGenerator:
+  - name: cluster-config
+    envs:
+      - gitops.env
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+# Kustomize replacements: inject env values into infrastructure manifests.
+# Each replacement below patches a specific field in a specific resource.
+replacements:
+  # ── LB IP pool CIDR ────────────────────────────────────────────────────────
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.LB_CIDR
+    targets:
+      - select:
+          kind: CiliumLoadBalancerIPPool
+        fieldPaths:
+          - spec.blocks.0.cidr
+
+  # ── Gateway TLS cert — IP SAN and DNS names ────────────────────────────────
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.GATEWAY_IP
+    targets:
+      - select:
+          kind: Certificate
+          name: gateway-tls
+        fieldPaths:
+          - spec.ipAddresses.0
+
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.WILDCARD_DOMAIN
+    targets:
+      - select:
+          kind: Certificate
+          name: gateway-tls
+        fieldPaths:
+          - spec.commonName
+          - spec.dnsNames.0
+      - select:
+          kind: HTTPRoute
+          name: http-to-https
+        fieldPaths:
+          - spec.hostnames.0
+
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.DOMAIN
+    targets:
+      - select:
+          kind: Certificate
+          name: gateway-tls
+        fieldPaths:
+          - spec.dnsNames.1
+
+  # ── Service hostnames ──────────────────────────────────────────────────────
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.ARGOCD_HOSTNAME
+    targets:
+      - select:
+          kind: HTTPRoute
+          name: argocd
+        fieldPaths:
+          - spec.hostnames.0
+
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.HUBBLE_HOSTNAME
+    targets:
+      - select:
+          kind: HTTPRoute
+          name: hubble-ui
+        fieldPaths:
+          - spec.hostnames.0
+
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.DASHBOARD_HOSTNAME
+    targets:
+      - select:
+          kind: HTTPRoute
+          name: ceph-dashboard
+        fieldPaths:
+          - spec.hostnames.0

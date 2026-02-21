@@ -1,0 +1,37 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: cilium-gateway
+  namespace: kube-system
+  annotations:
+    # Pinned to .200 so *.ceph.lab DNS entry stays stable
+    io.cilium/lb-ipam-ips: "192.168.56.200"
+spec:
+  gatewayClassName: cilium
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
+
+    - name: https
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: gateway-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+
+    # Cleartext gRPC for Hubble relay (Cilium proxies it, observes l7 flows)
+    - name: hubble-relay
+      port: 4245
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All

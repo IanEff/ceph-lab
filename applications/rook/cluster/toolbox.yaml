@@ -1,0 +1,91 @@
+# Inline Rook toolbox — runs ceph CLI against the live cluster.
+# Access: kubectl exec -it -n rook-ceph deploy/rook-ceph-tools -- bash
+# Alias:  rook-tools  (pre-configured in shell ergonomics)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rook-ceph-tools
+  namespace: rook-ceph
+  labels:
+    app: rook-ceph-tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rook-ceph-tools
+  template:
+    metadata:
+      labels:
+        app: rook-ceph-tools
+    spec:
+      dnsPolicy: ClusterFirstWithHostNet
+      serviceAccountName: rook-ceph-default
+      containers:
+        - name: rook-ceph-tools
+          # Must match cephcluster.yaml cephVersion.image
+          image: quay.io/ceph/ceph:v19.2.3
+          command:
+            - /bin/bash
+            - -c
+            - |
+              # Bootstrap ceph.conf from the mon-endpoints ConfigMap
+              MON_ENDPOINTS=$(grep ^data /etc/rook/mon-endpoints | cut -d= -f2 | tr ',' '\n' | \
+                awk -F= '{print $2}' | paste -sd,)
+              echo "[global]" > /etc/ceph/ceph.conf
+              echo "mon host = ${MON_ENDPOINTS}" >> /etc/ceph/ceph.conf
+              echo "auth cluster required = cephx" >> /etc/ceph/ceph.conf
+              echo "auth service required = cephx" >> /etc/ceph/ceph.conf
+              echo "auth client required  = cephx" >> /etc/ceph/ceph.conf
+              # Copy keyring
+              cp /var/lib/rook-ceph-mon/secret.keyring /etc/ceph/keyring
+              echo "[client.admin]" >> /etc/ceph/keyring
+              cat /var/lib/rook-ceph-mon/secret.keyring >> /etc/ceph/keyring
+              # Stay alive; re-generate config if endpoints change
+              while true; do sleep 3600; done
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 2016
+            runAsGroup: 2016
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: ROOK_CEPH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: rook-ceph-mon
+                  key: ceph-username
+          volumeMounts:
+            - mountPath: /etc/ceph
+              name: ceph-config
+            - mountPath: /etc/rook
+              name: mon-endpoint-volume
+            - mountPath: /var/lib/rook-ceph-mon
+              name: ceph-admin-secret
+              readOnly: true
+      volumes:
+        - name: ceph-admin-secret
+          secret:
+            secretName: rook-ceph-mon
+            items:
+              - key: ceph-secret
+                path: secret.keyring
+        - name: mon-endpoint-volume
+          configMap:
+            name: rook-ceph-mon-endpoints
+            items:
+              - key: data
+                path: mon-endpoints
+        - name: ceph-config
+          emptyDir: {}
+      tolerations:
+        - key: "node.kubernetes.io/unreachable"
+          operator: "Exists"
+          effect: "NoExecute"
+          tolerationSeconds: 5

@@ -1,0 +1,21 @@
+apiVersion: "cilium.io/v2alpha1"
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: ceph-lab-pool
+spec:
+  blocks:
+    - cidr: "192.168.56.192/27"   # patched from LB_CIDR via Kustomize (.200–.222)
+  allowFirstLastIPs: "No"
+---
+apiVersion: "cilium.io/v2alpha1"
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: ceph-lab-l2
+spec:
+  # All nodes can participate; Cilium elects one ARP responder per service
+  nodeSelector:
+    matchLabels: {}
+  interfaces:
+    - "^enp"    # VirtualBox host-only NIC pattern
+  externalIPs: false
+  loadBalancerIPs: true

@@ -1,0 +1,154 @@
+apiVersion: ceph.rook.io/v1
+kind: CephCluster
+metadata:
+  name: rook-ceph
+  namespace: rook-ceph
+spec:
+  # ── Ceph version ──────────────────────────────────────────────────────────
+  cephVersion:
+    image: quay.io/ceph/ceph:v19.2.3   # Squid — keep in sync with toolbox.yaml
+    allowUnsupported: false
+
+  dataDirHostPath: /var/lib/rook
+
+  # ── MONs ──────────────────────────────────────────────────────────────────
+  mon:
+    count: 3
+    allowMultiplePerNode: false
+
+  # ── MGR ───────────────────────────────────────────────────────────────────
+  mgr:
+    count: 1
+    modules:
+      - name: pg_autoscaler
+        enabled: true
+      - name: rook
+        enabled: true
+
+  # ── Dashboard ─────────────────────────────────────────────────────────────
+  dashboard:
+    enabled: true
+    ssl: false   # TLS terminated at the Cilium Gateway
+
+  # ── Observability ─────────────────────────────────────────────────────────
+  monitoring:
+    # Enable Prometheus metrics export from the MGR.
+    # Prometheus scrapes via service rook-ceph-mgr:9283.
+    enabled: true
+    metricsDisabled: false
+
+  # ── Networking ────────────────────────────────────────────────────────────
+  network:
+    connections:
+      compression:
+        enabled: false
+      encryption:
+        enabled: false
+      requireMsgr2: true
+
+  # ── Ops safety ────────────────────────────────────────────────────────────
+  crashCollector:
+    disable: false
+  logCollector:
+    enabled: true
+    periodicity: daily
+    maxLogSize: 100M
+  disruptionManagement:
+    managePodBudgets: true
+    osdMaintenanceTimeout: 30
+  cleanupPolicy:
+    # Requires explicit string "yes-really-destroy-data" to trigger cluster wipe.
+    # Leave empty — use wipe_ceph_disks.sh instead.
+    confirmation: ""
+
+  # ── OSD storage ───────────────────────────────────────────────────────────
+  storage:
+    useAllNodes: true
+    useAllDevices: false
+    # Targets /dev/sdc and /dev/sdd on each worker node.
+    # /dev/sdb is the k3s data disk and must NOT be touched.
+    deviceFilter: "^sd[cd]"
+    config:
+      storeType: bluestore
+
+  # ── Resource requests ─────────────────────────────────────────────────────
+  # Tuned for 6 GB worker nodes — conservative so OSD workloads don't OOM.
+  # Bump requests if you see throttling under load.
+  resources:
+    mon:
+      requests:
+        cpu: "100m"
+        memory: "512Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+    mgr:
+      requests:
+        cpu: "100m"
+        memory: "512Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+    osd:
+      requests:
+        cpu: "250m"
+        memory: "1Gi"
+      limits:
+        cpu: "2000m"
+        memory: "2Gi"
+    mds:
+      requests:
+        cpu: "100m"
+        memory: "512Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+    mgr-sidecar:
+      requests:
+        cpu: "100m"
+        memory: "40Mi"
+      limits:
+        cpu: "200m"
+        memory: "100Mi"
+    crashcollector:
+      requests:
+        cpu: "15m"
+        memory: "60Mi"
+      limits:
+        cpu: "500m"
+        memory: "60Mi"
+    logcollector:
+      requests:
+        cpu: "100m"
+        memory: "100Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+    cleanup:
+      requests:
+        cpu: "500m"
+        memory: "100Mi"
+      limits:
+        cpu: "500m"
+        memory: "1Gi"
+
+  # ── Placement ─────────────────────────────────────────────────────────────
+  # Prefer worker nodes — ceph-control is already busy (k3s API server, ArgoCD)
+  placement:
+    all:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: node-role.kubernetes.io/control-plane
+                  operator: DoesNotExist
+
+  # ── Priority classes ──────────────────────────────────────────────────────
+  priorityClassNames:
+    mon: system-node-critical
+    osd: system-node-critical
+    mgr: system-cluster-critical
+
+  skipUpgradeChecks: false
+  continueUpgradeAfterChecksEvenIfNotHealthy: false

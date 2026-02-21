@@ -1,0 +1,26 @@
+# Rook operator — installs Rook CRDs + operator Deployment.
+# prune: false  — never auto-delete the operator
+# selfHeal: true — re-apply if someone kubectl-edits it
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rook-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: default
+  source:
+    repoURL: GITOPS_REPO_URL
+    targetRevision: HEAD
+    path: applications/rook/operator
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: rook-ceph
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

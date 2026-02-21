@@ -1,0 +1,21 @@
+---
+# Ceph Dashboard HTTPRoute — routes dashboard.ceph.lab → rook-ceph-mgr-dashboard:7000
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ceph-dashboard
+  namespace: rook-ceph
+spec:
+  parentRefs:
+    - name: ceph-lab-gateway
+      namespace: cilium-gateway
+  hostnames:
+    - dashboard.ceph.lab
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: rook-ceph-mgr-dashboard
+          port: 7000

@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: infrastructure-set
+  namespace: argocd
+spec:
+  generators:
+    - git:
+        repoURL: GITOPS_REPO_URL
+        revision: HEAD
+        files:
+          - path: applications/infrastructure/**/config.json
+  template:
+    metadata:
+      name: "{{appName}}"
+      namespace: argocd
+      annotations:
+        argocd.argoproj.io/sync-wave: "{{syncWave}}"
+    spec:
+      project: default
+      source:
+        repoURL: GITOPS_REPO_URL
+        targetRevision: HEAD
+        path: "{{localPath}}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{namespace}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+          - ServerSideDiff=true

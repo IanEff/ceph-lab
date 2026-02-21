@@ -1,0 +1,23 @@
+---
+# Hubble UI HTTPRoute — lives in kube-system to be same-namespace as the service.
+# A ReferenceGrant in kube-system (hubble-reference-grant.yaml) allows the gateway
+# in cilium-gateway namespace to route to kube-system services.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: hubble-ui
+  namespace: kube-system
+spec:
+  parentRefs:
+    - name: ceph-lab-gateway
+      namespace: cilium-gateway
+  hostnames:
+    - hubble.ceph.lab
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: hubble-ui
+          port: 80

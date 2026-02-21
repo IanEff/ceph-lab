@@ -1,0 +1,17 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: hubble-ui
+  namespace: kube-system
+spec:
+  hostnames:
+    - "hubble.ceph.lab"    # patched from HUBBLE_HOSTNAME via Kustomize
+  parentRefs:
+    - kind: Gateway
+      name: cilium-gateway
+      namespace: kube-system
+      sectionName: https
+  rules:
+    - backendRefs:
+        - name: hubble-ui
+          port: 80

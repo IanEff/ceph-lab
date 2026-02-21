@@ -1,0 +1,37 @@
+# CephCluster CR — most conservative sync policy in the repo.
+# prune: false     — NEVER auto-delete the cluster CR
+# selfHeal: false  — don't fight the operator if it patches the live CR
+#
+# To update: edit cephcluster.yaml + manually sync in ArgoCD UI,
+# or: argocd app sync rook-cluster
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rook-cluster
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  project: default
+  source:
+    repoURL: GITOPS_REPO_URL
+    targetRevision: HEAD
+    path: applications/rook/cluster
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: rook-ceph
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+  ignoreDifferences:
+    # The Rook operator updates these fields — don't flag as drift
+    - group: ceph.rook.io
+      kind: CephCluster
+      jsonPointers:
+        - /status
+        - /spec/mon/count

@@ -1,0 +1,38 @@
+# L7 visibility for workloads in the default namespace making S3 calls.
+# Allows Hubble to record S3 PUT/GET paths and status codes.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: l7-visibility-clients
+  namespace: default
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities: [cluster, host, remote-node]
+  egress:
+    # DNS
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - { port: "53", protocol: UDP }
+            - { port: "53", protocol: TCP }
+          rules:
+            dns:
+              - matchPattern: "*"
+    # HTTP (S3 requests go through Envoy — L7 inspection active)
+    - toPorts:
+        - ports:
+            - { port: "80",   protocol: TCP }
+            - { port: "8080", protocol: TCP }
+          rules:
+            http: [{}]
+    # HTTPS + k8s API
+    - toEntities: [cluster]
+      toPorts:
+        - ports:
+            - { port: "443",  protocol: TCP }
+            - { port: "6443", protocol: TCP }
+    - toEntities: [kube-apiserver]

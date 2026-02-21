@@ -1,0 +1,62 @@
+kubeProxyReplacement: true
+routingMode: native
+autoDirectNodeRoutes: true
+
+bpf:
+  masquerade: true
+
+datapathMode: netkit
+devices:
+  - enp+
+
+loadBalancer:
+  mode: dsr
+  algorithm: maglev
+  acceleration: best-effort
+
+lbIPAM:
+  enabled: true
+
+l2announcements:
+  enabled: true
+
+gatewayAPI:
+  enabled: true
+
+operator:
+  replicas: 1
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    namespace: monitoring
+
+hubble:
+  enabled: true
+  metrics:
+    enabled:
+      - dns
+      - drop
+      - tcp
+      - flow
+      - icmp
+      - "httpV2:exemplars=true;labelsContext=source_ip,source_namespace,source_workload,destination_ip,destination_namespace,destination_workload,traffic_direction"
+    # Grafana sidecar will auto-import the Hubble dashboards
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      namespace: monitoring
+    serviceMonitor:
+      # Disabled at bootstrap; enabled once Prometheus CRDs are established
+      enabled: false
+  relay:
+    enabled: true
+  ui:
+    enabled: true
+
+dashboards:
+  enabled: true
+  label: grafana_dashboard
+  labelValue: "1"
+  namespace: monitoring

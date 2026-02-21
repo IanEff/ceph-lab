@@ -1,0 +1,1 @@
+{ "appName": "cilium", "syncWave": "-10", "namespace": "kube-system", "localPath": "applications/infrastructure/cilium" }

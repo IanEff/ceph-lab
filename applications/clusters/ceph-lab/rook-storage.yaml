@@ -1,0 +1,27 @@
+# Rook storage layer — CephBlockPool, CephFilesystem, CephObjectStore + StorageClasses.
+# prune: true  — removing a pool YAML file removes the pool.
+#                Safe because pool YAMLs have preservePoolsOnDelete / preserveFilesystemOnDelete=true.
+# selfHeal: true — re-apply if someone kubectl-edits a pool directly.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rook-storage
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  project: default
+  source:
+    repoURL: GITOPS_REPO_URL
+    targetRevision: HEAD
+    path: applications/rook/storage
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: rook-ceph
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

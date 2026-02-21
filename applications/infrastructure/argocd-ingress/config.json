@@ -1,0 +1,1 @@
+{ "appName": "argocd-ingress", "syncWave": "10", "namespace": "argocd", "localPath": "applications/infrastructure/argocd-ingress" }

@@ -1,0 +1,25 @@
+# Rook gateway routes — HTTPRoutes for Ceph Dashboard and Hubble Relay.
+# Low blast radius; fast to recreate.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rook-gateway
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "35"
+spec:
+  project: default
+  source:
+    repoURL: GITOPS_REPO_URL
+    targetRevision: HEAD
+    path: applications/rook/gateway
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: rook-ceph
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

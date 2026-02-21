@@ -1,0 +1,38 @@
+# L7 visibility for ArgoCD namespace.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: l7-visibility
+  namespace: argocd
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities: [cluster]
+      toPorts:
+        - ports:
+            - { port: "80",   protocol: TCP }
+            - { port: "443",  protocol: TCP }
+            - { port: "8080", protocol: TCP }
+            - { port: "8083", protocol: TCP }   # argocd-repo-server
+          rules:
+            http: [{}]
+    - fromEntities: [host, remote-node]
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - { port: "53", protocol: UDP }
+            - { port: "53", protocol: TCP }
+          rules:
+            dns:
+              - matchPattern: "*"
+    - toEntities: [cluster, kube-apiserver, world]
+      toPorts:
+        - ports:
+            - { port: "80",   protocol: TCP }
+            - { port: "443",  protocol: TCP }
+            - { port: "6443", protocol: TCP }
+            - { port: "22",   protocol: TCP }   # git over SSH
