@@ -251,25 +251,32 @@ TMUX
 chown vagrant:vagrant /home/vagrant/.vimrc /home/vagrant/.tmux.conf /home/vagrant/.bashrc
 
 echo "[11] VirtualBox Guest Additions + /vagrant shared folder"
-if ! lsmod | grep -q vboxguest 2>/dev/null; then
-    VBOX_ISO="/tmp/VBoxGuestAdditions.iso"
-    curl -fsSL -o "$VBOX_ISO" \
-        "https://download.virtualbox.org/virtualbox/7.2.4/VBoxGuestAdditions_7.2.4.iso"
+# Check for vboxsf (shared folder FS module), NOT vboxguest (kernel driver).
+# cloud-image/ubuntu-24.04 ships with vboxguest pre-loaded, but vboxsf
+# requires Guest Additions to be built from the ISO.
+if ! lsmod | grep -q vboxsf 2>/dev/null; then
     apt-get install -y build-essential linux-headers-"$(uname -r)" dkms
+    VBOX_ISO="/tmp/VBoxGuestAdditions.iso"
+    wget -q "https://download.virtualbox.org/virtualbox/7.2.4/VBoxGuestAdditions_7.2.4.iso" \
+        -O "$VBOX_ISO"
     mkdir -p /mnt/vbox-iso
     mount -o loop "$VBOX_ISO" /mnt/vbox-iso
-    /mnt/vbox-iso/VBoxLinuxAdditions.run --nox11 || true
+    ARCH=$(uname -m)
+    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+        /mnt/vbox-iso/VBoxLinuxAdditions-arm64.run --nox11 || true
+    else
+        /mnt/vbox-iso/VBoxLinuxAdditions.run --nox11 || true
+    fi
     umount /mnt/vbox-iso
-    rm -f "$VBOX_ISO"
+    rm -rf /mnt/vbox-iso "$VBOX_ISO"
+    modprobe vboxsf || echo "[WARN] vboxsf still not available after GA install"
 fi
 
-# Always ensure /vagrant is mounted — the vboxguest module may have been
-# pre-loaded by the base box, bypassing the block above, but the shared
-# folder still needs to be explicitly mounted.
+# Always ensure /vagrant is mounted.
 if ! mountpoint -q /vagrant 2>/dev/null; then
     mkdir -p /vagrant
     modprobe vboxsf 2>/dev/null || true
-    mount -t vboxsf vagrant /vagrant || echo "[WARN] /vagrant mount failed — node-token sharing will not work"
+    mount -t vboxsf vagrant /vagrant || echo "[WARN] /vagrant mount failed — shared folder unavailable"
 fi
 grep -q 'vboxsf' /etc/modules 2>/dev/null || echo "vboxsf" >> /etc/modules
 grep -q 'vagrant.*vboxsf' /etc/fstab || \
