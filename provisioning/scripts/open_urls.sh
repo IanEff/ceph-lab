@@ -75,10 +75,12 @@ fi
 if $DNS_OK; then
     ok "DNS resolves — direct access via hostname:"
     echo ""
-    printf "  %-12s  https://argocd.%s\n"    "ArgoCD"    "$DOMAIN"
-    printf "  %-12s  https://dashboard.%s\n" "Ceph"      "$DOMAIN"
-    printf "  %-12s  https://grafana.%s\n"   "Grafana"   "$DOMAIN"
-    printf "  %-12s  https://hubble.%s\n"    "Hubble"    "$DOMAIN"
+    printf "  %-12s  https://argocd.%s\n"        "ArgoCD"       "$DOMAIN"
+    printf "  %-12s  https://dashboard.%s\n"      "Ceph"         "$DOMAIN"
+    printf "  %-12s  https://grafana.%s\n"        "Grafana"      "$DOMAIN"
+    printf "  %-12s  https://prometheus.%s\n"     "Prometheus"   "$DOMAIN"
+    printf "  %-12s  https://alertmanager.%s\n"   "Alertmanager" "$DOMAIN"
+    printf "  %-12s  https://hubble.%s\n"         "Hubble"       "$DOMAIN"
 else
     warn "DNS not yet configured — use port-forwards or IP:"
     echo ""

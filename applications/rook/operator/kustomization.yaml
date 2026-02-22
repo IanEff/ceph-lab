@@ -12,6 +12,10 @@ helmCharts:
     releaseName: rook-ceph
     namespace: rook-ceph
     valuesInline:
+      # Allow the operator to create ServiceMonitors / PrometheusRules in rook-ceph.
+      # Requires Prometheus Operator CRDs (kube-prometheus-stack wave -5).
+      monitoring:
+        enabled: true
       csi:
         enableRbdDriver: true
         enableCephfsDriver: true

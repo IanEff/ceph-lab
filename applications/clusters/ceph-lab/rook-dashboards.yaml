@@ -1,0 +1,27 @@
+# Grafana dashboard ConfigMaps for Ceph Cluster, OSD, and Pool views.
+# Uses Kustomize configMapGenerator to build ConfigMaps labelled
+# grafana_dashboard=1 — Grafana's sidecar auto-imports them.
+# prune: true / selfHeal: true — dashboard updates in git sync immediately.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rook-dashboards
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "31"
+spec:
+  project: default
+  source:
+    repoURL: GITOPS_REPO_URL
+    targetRevision: HEAD
+    path: applications/rook/dashboards
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: rook-ceph
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

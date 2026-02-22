@@ -13,3 +13,7 @@ resources:
   - rook-cluster.yaml
   - rook-storage.yaml
   - rook-gateway.yaml
+  # Grafana dashboards for Ceph Cluster, OSD, and Pools (wave 31)
+  - rook-dashboards.yaml
+  # Grafana dashboards for Ceph Cluster, OSD, and Pools (wave 31)
+  - rook-dashboards.yaml

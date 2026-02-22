@@ -1,0 +1,32 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: rook-ceph
+
+# Each ConfigMap holds one Grafana dashboard JSON.
+# Grafana's sidecar (searchNamespace: ALL, label: grafana_dashboard: "1")
+# picks these up automatically from any namespace.
+configMapGenerator:
+  - name: grafana-dashboard-ceph-cluster
+    files:
+      - ceph-cluster.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+
+  - name: grafana-dashboard-ceph-osd
+    files:
+      - ceph-osd.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+
+  - name: grafana-dashboard-ceph-pools
+    files:
+      - ceph-pools.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+
+generatorOptions:
+  disableNameSuffixHash: true

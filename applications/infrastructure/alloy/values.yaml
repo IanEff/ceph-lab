@@ -123,6 +123,30 @@ alloy:
             ts     = "ts",
           }
         }
+        // ── Ceph / Rook log enrichment ────────────────────────────────────
+        // Ceph daemons emit structured lines like:
+        //   2024-01-01T00:00:00.000Z 7f... osd.0 10 0 :bluestore DEBUG ...
+        // Extract daemon type, subsystem, and log level for better filtering in Loki.
+        stage.match {
+          selector = "{namespace=\"rook-ceph\"}"
+          pipeline_name = "ceph_logs"
+
+          // Pull the daemon name out of the Ceph log prefix (e.g. osd.0, mgr.a, mon.b)
+          stage.regex {
+            expression = "(?P<ceph_daemon>(osd|mgr|mon|mds|rgw|rbd-mirror|crash)\\.[^\\s]+)"
+          }
+          stage.labels {
+            values = { ceph_daemon = "" }
+          }
+
+          // Extract log level from Ceph daemon output (DEBUG, INFO, WARNING, ERR)
+          stage.regex {
+            expression = "(?i) (?P<ceph_level>DEBUG|INFO|NOTICE|WARNING|ERR|CRITICAL|ALERT|EMERG)[ :]"
+          }
+          stage.labels {
+            values = { ceph_level = "" }
+          }
+        }
         forward_to = [loki.write.default.receiver]
       }
 

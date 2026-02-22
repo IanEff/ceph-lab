@@ -29,6 +29,10 @@ spec:
   dashboard:
     enabled: true
     ssl: false # TLS terminated at the Cilium Gateway
+    # Wire the dashboard to the internal Prometheus so it can show cluster metrics.
+    # Using the cluster-internal URL avoids TLS certificate issues.
+    prometheusEndpoint: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+    prometheusEndpointSSLVerify: false
 
   # ── Observability ─────────────────────────────────────────────────────────
   monitoring:
