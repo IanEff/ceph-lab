@@ -27,7 +27,7 @@ helmCharts:
                 prefix: loki_index_
                 period: 24h
         limits_config:
-          retention_period: 672h   # 28 days
+          retention_period: 672h # 28 days
       singleBinary:
         replicas: 1
         persistence:

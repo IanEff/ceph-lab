@@ -6,7 +6,7 @@ metadata:
 spec:
   # ── Ceph version ──────────────────────────────────────────────────────────
   cephVersion:
-    image: quay.io/ceph/ceph:v19.2.3   # Squid — keep in sync with toolbox.yaml
+    image: quay.io/ceph/ceph:v19.2.3 # Squid — keep in sync with toolbox.yaml
     allowUnsupported: false
 
   dataDirHostPath: /var/lib/rook
@@ -28,7 +28,7 @@ spec:
   # ── Dashboard ─────────────────────────────────────────────────────────────
   dashboard:
     enabled: true
-    ssl: false   # TLS terminated at the Cilium Gateway
+    ssl: false # TLS terminated at the Cilium Gateway
 
   # ── Observability ─────────────────────────────────────────────────────────
   monitoring:

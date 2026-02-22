@@ -5,7 +5,7 @@ metadata:
   namespace: argocd
 spec:
   hostnames:
-    - "argocd.ceph.lab"   # patched from ARGOCD_HOSTNAME via Kustomize
+    - "argocd.ceph.lab" # patched from ARGOCD_HOSTNAME via Kustomize
   parentRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway

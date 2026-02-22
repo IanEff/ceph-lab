@@ -5,7 +5,7 @@ metadata:
   namespace: kube-system
 spec:
   hostnames:
-    - "*.ceph.lab"     # patched from WILDCARD_DOMAIN via Kustomize
+    - "*.ceph.lab" # patched from WILDCARD_DOMAIN via Kustomize
   parentRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway

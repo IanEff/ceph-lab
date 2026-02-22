@@ -5,7 +5,7 @@ metadata:
   namespace: kube-system
 spec:
   hostnames:
-    - "hubble.ceph.lab"    # patched from HUBBLE_HOSTNAME via Kustomize
+    - "hubble.ceph.lab" # patched from HUBBLE_HOSTNAME via Kustomize
   parentRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway
