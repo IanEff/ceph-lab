@@ -29,18 +29,17 @@ spec:
             - -c
             - |
               # Bootstrap ceph.conf from the mon-endpoints ConfigMap
-              MON_ENDPOINTS=$(grep ^data /etc/rook/mon-endpoints | cut -d= -f2 | tr ',' '\n' | \
-                awk -F= '{print $2}' | paste -sd,)
+              # File format: "c=10.x.x.x:3300,a=10.x.x.x:3300,b=10.x.x.x:3300"
+              MON_ENDPOINTS=$(cat /etc/rook/mon-endpoints | tr ',' '\n' | awk -F= '{print $2}' | paste -sd,)
               echo "[global]" > /etc/ceph/ceph.conf
               echo "mon host = ${MON_ENDPOINTS}" >> /etc/ceph/ceph.conf
               echo "auth cluster required = cephx" >> /etc/ceph/ceph.conf
               echo "auth service required = cephx" >> /etc/ceph/ceph.conf
               echo "auth client required  = cephx" >> /etc/ceph/ceph.conf
-              # Copy keyring
-              cp /var/lib/rook-ceph-mon/secret.keyring /etc/ceph/keyring
-              echo "[client.admin]" >> /etc/ceph/keyring
-              cat /var/lib/rook-ceph-mon/secret.keyring >> /etc/ceph/keyring
-              # Stay alive; re-generate config if endpoints change
+              # Build proper INI-format keyring
+              CEPH_SECRET=$(cat /var/lib/rook-ceph-mon/secret.keyring)
+              printf '[client.admin]\n\tkey = %s\n' "${CEPH_SECRET}" > /etc/ceph/keyring
+              # Stay alive
               while true; do sleep 3600; done
           resources:
             requests:
