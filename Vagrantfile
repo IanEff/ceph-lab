@@ -116,11 +116,11 @@ Vagrant.configure("2") do |config|
     end
 
     # Secondary system disk → mounted at /var/lib/rancher (k3s data dir)
-    vm.vm.disk :disk, size: "40GB", name: "rancher_data"
+    vm.vm.disk :disk, size: "20GB", name: "rancher_data"
 
     # Raw OSD disks — left UNFORMATTED; Rook claims them automatically
     osd_disks.times do |i|
-      vm.vm.disk :disk, size: "50GB", name: "osd_#{i}"
+      vm.vm.disk :disk, size: "10GB", name: "osd_#{i}"
     end
 
     vm.vm.synced_folder ".", "/vagrant", disabled: true
