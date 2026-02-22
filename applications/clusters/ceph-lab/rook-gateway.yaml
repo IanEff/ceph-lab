@@ -24,6 +24,7 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
       - ServerSideDiff=true
+      - RespectIgnoreDifferences=true
   ignoreDifferences:
     # ArgoCD adds tracking-id annotation which appears as a diff under ServerSideDiff
     - group: gateway.networking.k8s.io
