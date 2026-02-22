@@ -49,9 +49,9 @@ spec:
   # ── Ceph config overrides ─────────────────────────────────────────────────
   # Raise clock drift tolerance to 100ms — VMs commonly drift more than the
   # default 50ms, causing spurious HEALTH_WARN on mon.c after restarts.
-  configOverride: |
-    [mon]
-    mon_clock_drift_allowed = 0.1
+  cephConfig:
+    mon:
+      mon_clock_drift_allowed: "0.1"
 
   # ── Ops safety ────────────────────────────────────────────────────────────
   crashCollector:
