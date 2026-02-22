@@ -208,25 +208,219 @@ authentication failures" when multiple keys are offered).
 
 ## General methodology for debugging persistent OutOfSync
 
-1. **Check `autoHealAttemptsCount`** — if it's climbing with phase "Succeeded", the diff is
-   caused by something the API server changes on every apply, not a config error.
+This section is a step-by-step playbook. Work through the steps in order — each one
+narrows down what kind of problem you're actually dealing with before you start changing
+things.
 
-2. **Get the raw diff ArgoCD sees:**
+---
+
+### Step 0: Understand what "OutOfSync" actually means
+
+ArgoCD continuously compares two things:
+
+- **Desired state**: the YAML files in git (after Kustomize/Helm rendering)
+- **Live state**: what `kubectl get <resource> -o yaml` returns from the cluster
+
+If they don't match, the app is `OutOfSync`. The app can be `Healthy` (workloads running
+fine) and `OutOfSync` simultaneously — health and sync are independent axes.
+
+ArgoCD's automated self-heal responds to OutOfSync by reapplying the manifests. If the
+cluster immediately goes OutOfSync again despite a successful apply, the diff is being
+*produced by the cluster itself*, not by a missing change.
+
+---
+
+### Step 1: Confirm the self-heal loop
+
+```bash
+kubectl --context=<ctx> -n argocd get app <name> -o jsonpath='{.status.operationState}' \
+  | python3 -m json.tool
+```
+
+Look for two things:
+
+- `"phase": "Succeeded"` — the sync operation *succeeded* (so it's not a broken manifest)
+- `"autoHealAttemptsCount": N` with N > 1 and climbing — ArgoCD keeps re-trying
+
+If both are true, the resource is being normalised by the cluster on every apply. You are
+not dealing with a misconfiguration; you are dealing with a defaulting/mutation issue.
+Skip ahead to Step 4.
+
+If `phase` is `"Failed"`, you have a genuine apply error — read `message` for details and
+fix the manifest or RBAC before continuing.
+
+---
+
+### Step 2: Find exactly which resources are out of sync
+
+ArgoCD tracks sync status per-resource. Get only the ones that aren't Synced:
+
+```bash
+kubectl --context=<ctx> -n argocd get app <name> -o json | python3 -c "
+import json, sys
+app = json.load(sys.stdin)
+for r in app['status']['resources']:
+    if r.get('status') != 'Synced':
+        print(r.get('group','core'), r['kind'], r['namespace'], r['name'], '→', r.get('status'), r.get('message',''))
+"
+```
+
+This tells you the exact resource type and name. Knowing whether it's an `HTTPRoute`, a
+`Gateway`, a `Deployment`, a `CRD`, etc. tells you where to look next.
+
+---
+
+### Step 3: Get the raw diff
+
+The most direct approach is to see what ArgoCD actually considers different. There are two
+ways depending on your ArgoCD sync mode:
+
+**Client-side diff (default):**
+```bash
+# See what kubectl would change if ArgoCD applied the manifest right now
+kubectl --context=<ctx> diff -f <path-to-rendered-manifest.yaml>
+```
+
+**Server-side diff (if `ServerSideApply=true` is in syncOptions):**
+```bash
+# Simulate what the API server would produce, using ArgoCD's field manager
+kubectl --context=<ctx> diff \
+  --server-side \
+  --field-manager=argocd-controller \
+  -f <path-to-rendered-manifest.yaml>
+```
+
+The output is a standard unified diff. Lines prefixed `-` are in the live object but not
+in your manifest; lines prefixed `+` are in your manifest but not live. Anything the API
+server injects will show up as `-` lines (present live, absent in your file).
+
+If `kubectl diff` shows nothing but ArgoCD still says OutOfSync, the diff is in metadata
+ArgoCD tracks separately — check annotations (see Step 5).
+
+---
+
+### Step 4: Understand what the API server actually stores
+
+Kubernetes admission webhooks can mutate resources on write — adding fields with default
+values that you didn't specify. The resource stored in etcd differs from what you applied.
+This is expected and correct behaviour; the problem is only that your source manifest
+doesn't reflect it.
+
+To see the canonical stored form:
+```bash
+kubectl --context=<ctx> -n <namespace> get <kind> <name> -o yaml
+```
+
+Compare this line-by-line against your source manifest. Fields present in the live object
+but absent from your manifest are being defaulted by a webhook. Add them explicitly to your
+source file — then git, your manifest, and the live object all agree, and the diff
+disappears permanently.
+
+Common examples in this repo:
+
+| Webhook | Fields it injects |
+|---|---|
+| Gateway API | `backendRefs[*].group: ""`, `backendRefs[*].kind: Service`, `backendRefs[*].weight: 1` |
+| Gateway API | `rules[*].matches: [{path: {type: PathPrefix, value: /}}]` on HTTPRoute |
+| Gateway API | `tls.certificateRefs[*].group: ""`, `tls.certificateRefs[*].kind: Secret` on Gateway |
+
+The fix is always the same: copy those fields into your source YAML. They are just
+spelling out what the API would have assumed anyway — adding them is safe and idempotent.
+
+---
+
+### Step 5: Check for annotation-driven diffs
+
+Some ArgoCD features cause it to write annotations onto live resources that are not in the
+source manifest, which then appear as diffs:
+
+- `argocd.argoproj.io/tracking-id` — added by ArgoCD to track resource ownership
+- `kubectl.kubernetes.io/last-applied-configuration` — added by client-side apply
+
+These are usually harmless in practice, but if they cause false OutOfSync signals you have
+two options:
+
+**Option A (preferred): switch to ServerSideApply** — this uses server-side apply which
+doesn't write `last-applied-configuration`, and ArgoCD's tracking annotation is handled
+differently. Add to `syncOptions`:
+```yaml
+syncOptions:
+  - ServerSideApply=true
+```
+
+**Option B (last resort): `ignoreDifferences`** — suppresses the diff in ArgoCD's
+comparison without fixing the underlying cause. Use only for fields you genuinely cannot
+control (e.g. operator-managed status subresources):
+```yaml
+ignoreDifferences:
+  - group: some.api.group
+    kind: SomeKind
+    jsonPointers:
+      - /metadata/annotations/some-annotation
+```
+
+Avoid `ignoreDifferences` for anything in `spec` — it hides real divergence.
+
+---
+
+### Step 6: Check for operator-managed fields
+
+Some controllers (Rook, cert-manager, the Gateway controller itself) write back into
+`spec` fields after creation. For example, Rook's mon controller updates
+`spec/mon/count` after initial placement. These fields will always differ from your source.
+
+For these, `ignoreDifferences` with `jsonPointers` *is* the right tool — but scope it
+tightly to the exact path. Also consider `prune: false` + `selfHeal: false` for resources
+whose lifecycle is entirely owned by an operator (e.g. `CephCluster`).
+
+Example from `rook-cluster.yaml`:
+```yaml
+ignoreDifferences:
+  - group: ceph.rook.io
+    kind: CephCluster
+    jsonPointers:
+      - /status
+      - /spec/mon/count
+```
+
+---
+
+### Step 7: Verify the fix holds across a resync
+
+After updating manifests:
+
+1. Commit and push to git.
+2. Force a hard refresh so ArgoCD re-fetches from git immediately (rather than waiting for
+   the poll interval):
    ```bash
-   kubectl --context=<ctx> -n argocd get app <name> -o json | \
-     python3 -c "import json,sys; a=json.load(sys.stdin); \
-     [print(r['kind'],r['name'],r.get('status'),r.get('message','')) \
-      for r in a['status']['resources'] if r.get('status')!='Synced']"
+   kubectl --context=<ctx> -n argocd patch app <name> \
+     --type merge \
+     -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'
    ```
-
-3. **Compare live vs manifest manually:**
+3. Wait ~30 seconds, then check:
    ```bash
-   # What does the API server actually store?
-   kubectl --context=<ctx> -n <ns> get <kind> <name> -o yaml
-   # What would a server-side apply produce?
-   kubectl --context=<ctx> diff --server-side --field-manager=argocd-controller -f manifest.yaml
+   kubectl --context=<ctx> -n argocd get applications
    ```
+4. If the app goes `Synced` and stays there through the next reconcile cycle (~3 minutes),
+   the fix is solid. If it flips back to OutOfSync, return to Step 3 — there's another
+   field being injected that you haven't captured yet.
 
-4. **Fix the manifest, not ArgoCD's comparison settings** — adding `ignoreDifferences` to
-   paper over normalisation drift creates invisible state divergence and makes debugging
-   harder. The manifest should be the truth; make it match.
+---
+
+### Decision tree summary
+
+```
+App is OutOfSync
+│
+├─ phase=Failed → fix the manifest / RBAC error shown in message
+│
+└─ phase=Succeeded, autoHealAttemptsCount climbing
+   │
+   ├─ kubectl diff shows a field diff
+   │  ├─ Field is in spec → webhook is injecting defaults → add fields to manifest
+   │  └─ Field is in metadata/annotations → consider ServerSideApply=true
+   │
+   └─ kubectl diff shows nothing
+      └─ ArgoCD tracking annotation drift → ServerSideApply=true usually fixes it
+         └─ If not → ignoreDifferences on that exact annotation path (last resort)
+```
