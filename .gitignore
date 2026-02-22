@@ -1,3 +1,6 @@
+# Helm chart caches (built by kustomize --enable-helm during local bootstrap)
+applications/**/charts/
+
 # Local environment — never commit real credentials
 .env
 

@@ -3,11 +3,11 @@ kind: Gateway
 metadata:
   name: cilium-gateway
   namespace: kube-system
-  annotations:
-    # Pinned to .200 so *.ceph.lab DNS entry stays stable
-    io.cilium/lb-ipam-ips: "192.168.56.200"
 spec:
   gatewayClassName: cilium
+  addresses:
+    - type: IPAddress
+      value: "192.168.56.200"
   listeners:
     - name: http
       port: 80
