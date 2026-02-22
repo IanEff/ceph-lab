@@ -21,7 +21,7 @@ that provisions itself while you read the [Mastering Ceph](https://www.packtpub.
 | VMs | Vagrant + VirtualBox | Ubuntu 24.04, 4 nodes |
 | Kubernetes | k3s v1.32 | Single binary, SQLite, ~500 MB RAM |
 | CNI + LB | Cilium 1.18.2 | eBPF, kube-proxy free, Gateway API, L2 LB, Hubble |
-| Storage | Rook v1.19.1 + Ceph Squid v19.2.3 | RBD, CephFS, RGW (S3) |
+| Storage | Rook v1.19.1 + Ceph Tentacle v20.2.0 | RBD, CephFS, RGW (S3) |
 | GitOps | ArgoCD stable | Kustomize-Helm, sync waves, insecure (TLS at gateway) |
 | TLS | cert-manager v1.14.5 | Self-signed CA `ceph-lab-ca`, wildcard `*.ceph.lab` |
 | Observability | kube-prometheus-stack + Loki + Tempo + Alloy | Full LGTM stack |
@@ -205,7 +205,7 @@ All tuneable via `.env` (see `.env.example` for descriptions):
 
 - [Mastering Ceph, 2nd Ed.](https://www.packtpub.com/product/mastering-ceph-second-edition/9781789610703) — Nick Fisk
 - [Red Hat Ceph Storage 9 Documentation](https://access.redhat.com/documentation/en-us/red_hat_ceph_storage/9)
-- [Ceph Upstream Docs (Squid)](https://docs.ceph.com/en/squid/)
+- [Ceph Upstream Docs (Tentacle)](https://docs.ceph.com/en/tentacle/)
 - [Rook Ceph Documentation](https://rook.io/docs/rook/latest/)
 - [Cilium Documentation](https://docs.cilium.io/en/stable/)
 - [ArgoCD Documentation](https://argo-cd.readthedocs.io/en/stable/)

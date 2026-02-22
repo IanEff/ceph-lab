@@ -23,7 +23,7 @@ spec:
       containers:
         - name: rook-ceph-tools
           # Must match cephcluster.yaml cephVersion.image
-          image: quay.io/ceph/ceph:v19.2.3
+          image: quay.io/ceph/ceph:v20.2.0
           command:
             - /bin/bash
             - -c

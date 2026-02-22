@@ -275,7 +275,7 @@ cilium connectivity test
 
 ## Useful links
 
-- [Ceph Squid Release Notes](https://docs.ceph.com/en/squid/releases/squid/)
+- [Ceph Tentacle Release Notes](https://docs.ceph.com/en/tentacle/releases/tentacle/)
 - [Rook Ceph Troubleshooting](https://rook.io/docs/rook/latest/Troubleshooting/ceph-common-issues/)
 - [Ceph PG Calculator](https://old.ceph.com/pgcalc/)
 - [Red Hat Ceph Storage 9 — Troubleshooting](https://access.redhat.com/documentation/en-us/red_hat_ceph_storage/9/html/troubleshooting_guide/)
