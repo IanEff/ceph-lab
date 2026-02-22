@@ -20,5 +20,8 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: rook-ceph-mgr-dashboard
+        - group: ""
+          kind: Service
+          name: rook-ceph-mgr-dashboard
           port: 7000
+          weight: 1

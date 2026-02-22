@@ -13,6 +13,13 @@ spec:
       namespace: kube-system
       sectionName: https
   rules:
-    - backendRefs:
-        - name: kube-prometheus-stack-grafana
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: kube-prometheus-stack-grafana
           port: 80
+          weight: 1

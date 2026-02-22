@@ -32,16 +32,3 @@ spec:
         syncOptions:
           - CreateNamespace=true
           - ServerSideApply=true
-          - ServerSideDiff=true
-          - RespectIgnoreDifferences=true
-      ignoreDifferences:
-        # ArgoCD adds tracking-id annotation which appears as a diff under ServerSideDiff
-        - group: gateway.networking.k8s.io
-          kind: HTTPRoute
-          jsonPointers: ["/metadata/annotations/argocd.argoproj.io~1tracking-id"]
-        - group: gateway.networking.k8s.io
-          kind: GRPCRoute
-          jsonPointers: ["/metadata/annotations/argocd.argoproj.io~1tracking-id"]
-        - group: gateway.networking.k8s.io
-          kind: Gateway
-          jsonPointers: ["/metadata/annotations/argocd.argoproj.io~1tracking-id"]

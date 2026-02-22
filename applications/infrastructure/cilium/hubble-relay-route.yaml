@@ -14,5 +14,8 @@ spec:
       sectionName: hubble-relay
   rules:
     - backendRefs:
-        - name: hubble-relay
+        - group: ""
+          kind: Service
+          name: hubble-relay
           port: 80
+          weight: 1

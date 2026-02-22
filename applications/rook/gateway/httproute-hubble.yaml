@@ -19,5 +19,8 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: hubble-ui
+        - group: ""
+          kind: Service
+          name: hubble-ui
           port: 80
+          weight: 1
