@@ -1,6 +1,6 @@
 # GRPCRoute for Hubble relay — enables hubble CLI + external Hubble clients
 # to reach the relay via the Gateway on port 4245 (cleartext gRPC).
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1
 kind: GRPCRoute
 metadata:
   name: hubble-relay
