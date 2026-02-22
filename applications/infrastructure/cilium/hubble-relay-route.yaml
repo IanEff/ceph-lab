@@ -7,7 +7,8 @@ metadata:
   namespace: kube-system
 spec:
   parentRefs:
-    - kind: Gateway
+    - group: gateway.networking.k8s.io
+      kind: Gateway
       name: cilium-gateway
       namespace: kube-system
       sectionName: hubble-relay
