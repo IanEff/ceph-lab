@@ -3,5 +3,3 @@ kind: Kustomization
 
 resources:
   - httproute-dashboard.yaml
-  - httproute-hubble.yaml
-  - hubble-reference-grant.yaml

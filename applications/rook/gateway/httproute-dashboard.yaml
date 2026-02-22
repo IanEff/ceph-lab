@@ -7,8 +7,8 @@ metadata:
   namespace: rook-ceph
 spec:
   parentRefs:
-    - name: ceph-lab-gateway
-      namespace: cilium-gateway
+    - name: cilium-gateway
+      namespace: kube-system
   hostnames:
     - dashboard.ceph.lab
   rules:
