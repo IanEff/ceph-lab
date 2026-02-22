@@ -6,7 +6,7 @@ metadata:
 spec:
   generators:
     - git:
-        repoURL: GITOPS_REPO_URL
+        repoURL: git@github.com:ianeff/ceph-lab.git
         revision: HEAD
         files:
           - path: applications/infrastructure/**/config.json
@@ -19,7 +19,7 @@ spec:
     spec:
       project: default
       source:
-        repoURL: GITOPS_REPO_URL
+        repoURL: git@github.com:ianeff/ceph-lab.git
         targetRevision: HEAD
         path: "{{localPath}}"
       destination:

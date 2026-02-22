@@ -1,5 +1,5 @@
 # Root Application — seeds the entire GitOps tree.
-# Applied by install_argocd.sh after substituting GITOPS_REPO_URL.
+# Applied by install_argocd.sh after substituting git@github.com:ianeff/ceph-lab.git.
 #
 # This Application manages the ceph-lab cluster directory, which in turn
 # contains:
@@ -15,7 +15,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: GITOPS_REPO_URL
+    repoURL: git@github.com:ianeff/ceph-lab.git
     targetRevision: HEAD
     path: applications/clusters/ceph-lab
   destination:

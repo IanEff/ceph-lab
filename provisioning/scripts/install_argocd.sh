@@ -37,6 +37,40 @@ echo "  ceph-lab — ArgoCD bootstrap              "
 echo "  Repo: ${GITOPS_REPO_URL}                 "
 echo "══════════════════════════════════════════"
 
+echo "[0] Pre-bootstrap Cilium Gateway resources (LBIPPool, L2Policy, Gateway, HTTPRoutes)"
+echo "    This makes 192.168.56.200 reachable before ArgoCD reconciles wave -10."
+CILIUM_APP=/vagrant/applications/infrastructure/cilium
+bootstrap_ok=0
+for attempt in $(seq 1 8); do
+    echo "[0] Building and applying Cilium kustomization (attempt ${attempt}/8)..."
+    output=$(kubectl kustomize "${CILIUM_APP}" --enable-helm \
+        | kubectl apply --server-side --force-conflicts -f - 2>&1) || true
+    echo "$output"
+    if echo "$output" | grep -qE ' configured$| created$| unchanged$'; then
+        bootstrap_ok=1
+        break
+    fi
+    echo "[0] Attempt ${attempt}/8 incomplete; retrying in 10s..."
+    sleep 10
+done
+if [ "$bootstrap_ok" -eq 1 ]; then
+    echo "[0] Cilium resources applied.  Waiting for daemonset to settle..."
+    kubectl rollout status daemonset/cilium -n kube-system --timeout=3m || true
+else
+    echo "[WARN] Pre-bootstrap may be incomplete; ArgoCD will reconcile."
+fi
+
+echo "[0] Waiting for Gateway to acquire LB IP (up to 120s)..."
+for i in $(seq 1 12); do
+    GW_IP=$(kubectl get gateway cilium-gateway -n kube-system \
+        -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || true)
+    if [ -n "$GW_IP" ]; then
+        echo "[0] Gateway LB IP: ${GW_IP}  — 192.168.56.200 is now L2-announced."
+        break
+    fi
+    sleep 10
+done
+
 echo "[1] Install ArgoCD (${ARGOCD_VERSION})"
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply --server-side -n argocd -f \
@@ -64,6 +98,7 @@ type: Opaque
 stringData:
   type: git
   url: "${GITOPS_REPO_URL}"
+  insecureIgnoreHostKey: "true"
   sshPrivateKey: |
 $(echo "$SSH_KEY" | sed 's/^/    /')
 EOF

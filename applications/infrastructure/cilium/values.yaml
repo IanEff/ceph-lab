@@ -10,7 +10,7 @@ devices:
   - enp+
 
 loadBalancer:
-  mode: dsr
+  mode: snat
   algorithm: maglev
   acceleration: best-effort
 
