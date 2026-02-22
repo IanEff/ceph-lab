@@ -51,7 +51,7 @@ spec:
   # default 50ms, causing spurious HEALTH_WARN on mon.c after restarts.
   cephConfig:
     mon:
-      mon_clock_drift_allowed: "0.1"
+      mon_clock_drift_allowed: "0.5"
 
   # ── Ops safety ────────────────────────────────────────────────────────────
   crashCollector:
