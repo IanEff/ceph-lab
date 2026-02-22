@@ -38,7 +38,7 @@ CONFIG = {
   cache_quay_port:  ENV.fetch("SANDBOX_CACHE_REGISTRY_QUAY_PORT",      "5004"),
 
   configure_dnsmasq:ENV.fetch("SANDBOX_CONFIGURE_DNSMASQ", "1") == "1",
-  install_argocd:   ENV.fetch("SANDBOX_INSTALL_ARGOCD",    "1") == "1",
+  install_argocd:   ENV.fetch("SANDBOX_INSTALL_ARGOCD",    "0") == "1",
 
   k8s_minor:        ENV.fetch("SANDBOX_KUBERNETES_VERSION_MINOR", "1.32"),
   k3s_channel:      nil,  # resolved below
@@ -75,13 +75,13 @@ Vagrant.configure("2") do |config|
   config.trigger.after :up do |t|
     t.name    = "Merge kubeconfig (ceph-lab)"
     t.only_on = last_node
-    t.run     = { inline: "python3 #{File.expand_path('..', __FILE__)}/provisioning/scripts/manage_k8s_config.py add" }
+    t.run     = { inline: "python3 #{File.dirname(__FILE__)}/provisioning/scripts/manage_k8s_config.py add" }
   end
 
   config.trigger.before :destroy do |t|
     t.name    = "Remove kubeconfig (ceph-lab)"
     t.only_on = last_node
-    t.run     = { inline: "python3 #{File.expand_path('..', __FILE__)}/provisioning/scripts/manage_k8s_config.py remove" }
+    t.run     = { inline: "python3 #{File.dirname(__FILE__)}/provisioning/scripts/manage_k8s_config.py remove" }
   end
 
   if CONFIG[:configure_dnsmasq]

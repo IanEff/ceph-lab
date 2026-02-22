@@ -71,9 +71,6 @@ def build_ssh_block(keys: dict[str, str]) -> str:
             f"  HostName {ip}",
             f"  User vagrant",
             f"  IdentityFile {key}",
-            f"  IdentitiesOnly yes",
-            f"  PreferredAuthentications publickey",
-            f"  PubkeyAuthentication yes",
             f"  StrictHostKeyChecking no",
             f"  UserKnownHostsFile /dev/null",
             f"  LogLevel ERROR",
@@ -116,77 +113,49 @@ def remove_ssh_config() -> None:
 # ── kubeconfig helpers ────────────────────────────────────────────────────────
 
 
-def fetch_kubeconfig(retries: int = 6, delay: float = 10.0) -> str:  # type: ignore
-    """SCP the kubeconfig directly from the control plane using its Vagrant key."""
-    keys = scan_vms()
-    key_path = keys.get("ceph-control")
-    if not key_path:
-        raise RuntimeError("ceph-control private key not found — has vagrant up run?")
-
+def fetch_kubeconfig(retries: int = 6, delay: float = 10.0) -> str:
+    """SSH to the control plane and retrieve its kubeconfig, with retries."""
     for attempt in range(1, retries + 1):
         try:
-            with tempfile.NamedTemporaryFile(mode="r", suffix=".yaml", delete=False) as f:
-                tmp_path = f.name
             result = subprocess.run(
                 [
-                    "scp",
+                    "ssh",
+                    "-F",
+                    str(SSH_CONFIG),
                     "-o",
-                    "StrictHostKeyChecking=no",
+                    "ConnectTimeout=15",
                     "-o",
-                    "UserKnownHostsFile=/dev/null",
+                    "BatchMode=yes",
                     "-o",
                     "IdentitiesOnly=yes",
-                    "-o",
-                    f"ConnectTimeout=15",
-                    "-i",
-                    key_path,
-                    f"vagrant@{CONTROL_PLANE_IP}:/home/vagrant/.kube/config",
-                    tmp_path,
+                    "ceph-control",
+                    "cat /home/vagrant/.kube/config",
                 ],
                 capture_output=True,
                 text=True,
                 check=True,
             )
-            content = Path(tmp_path).read_text()
-            Path(tmp_path).unlink(missing_ok=True)
-            return content
+            return result.stdout
         except subprocess.CalledProcessError as e:
-            Path(tmp_path).unlink(missing_ok=True)
             if attempt < retries:
-                msg = e.stderr.strip() or f"exit {e.returncode}"
                 print(
-                    f"  SCP attempt {attempt}/{retries} failed ({msg}); retrying in {delay:.0f}s…"
+                    f"  SSH attempt {attempt}/{retries} failed (exit {e.returncode})"
+                    f"{': ' + e.stderr.strip() if e.stderr.strip() else ''}; "
+                    f"retrying in {delay:.0f}s…"
                 )
                 time.sleep(delay)
                 delay = min(delay * 1.5, 60.0)
             else:
-                print(f"  SCP failed after {retries} attempts: {e.stderr.strip()}")
+                print(f"  SSH failed after {retries} attempts: {e.stderr.strip()}")
                 raise
 
 
 def rewrite_names(raw: str) -> str:
-    """Rename the default context/cluster/user to ceph-lab-* names.
-
-    k3s uses 'default' for all three.  We use the surrounding YAML structure
-    (the same technique as sandbox-rook) to distinguish cluster / context / user
-    entries so each gets the right target name.
-    """
-    # Cluster list entry: `  name: default` immediately before `contexts:`
-    raw = raw.replace(
-        "  name: default\ncontexts:",
-        f"  name: {CLUSTER_NAME}\ncontexts:",
-    )
-    # Context block references
-    raw = raw.replace("    cluster: default", f"    cluster: {CLUSTER_NAME}")
-    raw = raw.replace("    user: default", f"    user: {USER_NAME}")
-    # Context list entry name (preceded by the user line we just rewrote)
-    raw = raw.replace(
-        f"    user: {USER_NAME}\n  name: default\n",
-        f"    user: {USER_NAME}\n  name: {CONTEXT_NAME}\n",
-    )
-    raw = raw.replace("current-context: default", f"current-context: {CONTEXT_NAME}")
-    # User list entry name
-    raw = raw.replace(f"\n- name: default\n  user:", f"\n- name: {USER_NAME}\n  user:")
+    """Rename the default context/cluster/user to ceph-lab-* names."""
+    raw = re.sub(r"\bcluster: default\b", f"cluster: {CLUSTER_NAME}", raw)
+    raw = re.sub(r"\buser: default\b", f"user: {USER_NAME}", raw)
+    raw = re.sub(r"\bname: default\b", f"name: {CONTEXT_NAME}", raw)
+    raw = re.sub(r"\bcurrent-context: default\b", f"current-context: {CONTEXT_NAME}", raw)
     return raw
 
 
@@ -199,16 +168,8 @@ def add_kube_config() -> None:
         tmp_path = f.name
 
     try:
-        # Remove any stale ceph-lab entries before merging so old certs don't linger
-        for cmd in [
-            ["kubectl", "config", "delete-context", CONTEXT_NAME],
-            ["kubectl", "config", "delete-cluster", CLUSTER_NAME],
-            ["kubectl", "config", "delete-user", USER_NAME],
-        ]:
-            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
         env = os.environ.copy()
-        env["KUBECONFIG"] = f"{tmp_path}:{KUBE_CONFIG}" if KUBE_CONFIG.exists() else tmp_path
+        env["KUBECONFIG"] = f"{KUBE_CONFIG}:{tmp_path}"
         result = subprocess.run(
             ["kubectl", "config", "view", "--flatten"],
             capture_output=True,
@@ -241,99 +202,6 @@ def remove_kube_config() -> None:
     print(f"  Removed kubeconfig context/cluster/user for {CONTEXT_NAME}")
 
 
-# ── CA trust helper ───────────────────────────────────────────────────────────
-
-
-def trust_ca() -> None:
-    """Extract the fixed ceph-lab CA cert and trust it in the macOS System Keychain.
-
-    Because the CA keypair is committed to the repo and never regenerated, this
-    only needs to take effect once — the fingerprint check prevents re-prompting
-    for sudo on subsequent 'manage_k8s_config.py add' calls.
-    """
-    import tempfile as _tmpfile
-
-    cert_file = Path(_tmpfile.gettempdir()) / "ceph-lab-ca.crt"
-
-    print("  Extracting ceph-lab CA cert...")
-    try:
-        result = subprocess.run(
-            [
-                "kubectl",
-                "get",
-                "secret",
-                "ceph-lab-ca-keypair",
-                "-n",
-                "cert-manager",
-                "--context",
-                CONTEXT_NAME,
-                "-o",
-                "jsonpath={.data.tls\\.crt}",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except subprocess.CalledProcessError:
-        print(
-            "  WARNING: ceph-lab-ca-keypair secret not found — cert-manager may still be syncing."
-        )
-        print("  Run 'bash provisioning/scripts/trust_ca.sh' after the cluster is ready.")
-        return
-
-    import base64 as _b64
-
-    cert_pem = _b64.b64decode(result.stdout.strip()).decode()
-    cert_file.write_text(cert_pem)
-
-    # Check if already trusted
-    fp_result = subprocess.run(
-        ["openssl", "x509", "-noout", "-fingerprint", "-sha256", "-in", str(cert_file)],
-        capture_output=True,
-        text=True,
-    )
-    fingerprint = fp_result.stdout.split("=", 1)[-1].strip().replace(":", "").upper()
-
-    already_trusted = False
-    try:
-        certs_result = subprocess.run(
-            ["security", "find-certificate", "-Z", "-a", "/Library/Keychains/System.keychain"],
-            capture_output=True,
-            text=True,
-        )
-        if fingerprint in certs_result.stdout.upper():
-            already_trusted = True
-    except Exception:
-        pass
-
-    if already_trusted:
-        print("  CA cert already trusted in System Keychain — skipping.")
-        return
-
-    print("  Trusting CA cert in macOS System Keychain (requires sudo)...")
-    try:
-        subprocess.run(
-            [
-                "sudo",
-                "security",
-                "add-trusted-cert",
-                "-d",
-                "-r",
-                "trustRoot",
-                "-k",
-                "/Library/Keychains/System.keychain",
-                str(cert_file),
-            ],
-            check=True,
-        )
-        print("  CA cert trusted. *.ceph.lab TLS will be valid in browsers and argocd CLI.")
-    except subprocess.CalledProcessError:
-        print("  WARNING: Failed to trust CA cert. Run manually:")
-        print(
-            f"    sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain {cert_file}"
-        )
-
-
 # ── Entrypoint ────────────────────────────────────────────────────────────────
 
 
@@ -352,7 +220,6 @@ def main() -> None:
         update_ssh_config(keys)
         if keys.get("ceph-control"):
             add_kube_config()
-            trust_ca()
         else:
             print("  WARNING: ceph-control not found; skipping kubeconfig merge.")
         print("Done.")
