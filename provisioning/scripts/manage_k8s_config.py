@@ -259,26 +259,38 @@ def trust_ca() -> None:
     try:
         result = subprocess.run(
             [
-                "kubectl", "get", "secret", "ceph-lab-ca-keypair",
-                "-n", "cert-manager",
-                "--context", CONTEXT_NAME,
-                "-o", "jsonpath={.data.tls\\.crt}",
+                "kubectl",
+                "get",
+                "secret",
+                "ceph-lab-ca-keypair",
+                "-n",
+                "cert-manager",
+                "--context",
+                CONTEXT_NAME,
+                "-o",
+                "jsonpath={.data.tls\\.crt}",
             ],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         )
     except subprocess.CalledProcessError:
-        print("  WARNING: ceph-lab-ca-keypair secret not found — cert-manager may still be syncing.")
+        print(
+            "  WARNING: ceph-lab-ca-keypair secret not found — cert-manager may still be syncing."
+        )
         print("  Run 'bash provisioning/scripts/trust_ca.sh' after the cluster is ready.")
         return
 
     import base64 as _b64
+
     cert_pem = _b64.b64decode(result.stdout.strip()).decode()
     cert_file.write_text(cert_pem)
 
     # Check if already trusted
     fp_result = subprocess.run(
         ["openssl", "x509", "-noout", "-fingerprint", "-sha256", "-in", str(cert_file)],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     fingerprint = fp_result.stdout.split("=", 1)[-1].strip().replace(":", "").upper()
 
@@ -286,7 +298,8 @@ def trust_ca() -> None:
     try:
         certs_result = subprocess.run(
             ["security", "find-certificate", "-Z", "-a", "/Library/Keychains/System.keychain"],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         if fingerprint in certs_result.stdout.upper():
             already_trusted = True
@@ -301,9 +314,14 @@ def trust_ca() -> None:
     try:
         subprocess.run(
             [
-                "sudo", "security", "add-trusted-cert",
-                "-d", "-r", "trustRoot",
-                "-k", "/Library/Keychains/System.keychain",
+                "sudo",
+                "security",
+                "add-trusted-cert",
+                "-d",
+                "-r",
+                "trustRoot",
+                "-k",
+                "/Library/Keychains/System.keychain",
                 str(cert_file),
             ],
             check=True,
@@ -311,7 +329,9 @@ def trust_ca() -> None:
         print("  CA cert trusted. *.ceph.lab TLS will be valid in browsers and argocd CLI.")
     except subprocess.CalledProcessError:
         print("  WARNING: Failed to trust CA cert. Run manually:")
-        print(f"    sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain {cert_file}")
+        print(
+            f"    sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain {cert_file}"
+        )
 
 
 # ── Entrypoint ────────────────────────────────────────────────────────────────

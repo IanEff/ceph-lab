@@ -104,12 +104,12 @@ kubectl exec -it -n rook-ceph deploy/rook-ceph-tools -- ceph status
 
 | Service | URL | Credentials |
 |---|---|---|
-| ArgoCD | https://argocd.ceph.lab | admin / see `.env` (ARGOCD_BCRYPT_PASSWORD) |
-| Ceph Dashboard | https://dashboard.ceph.lab | admin / `kubectl -n rook-ceph get secret rook-ceph-dashboard-password -o jsonpath='{.data.password}' \| base64 -d` |
-| Grafana | https://grafana.ceph.lab | admin / prom-operator |
-| Hubble UI | https://hubble.ceph.lab | — |
-| Prometheus | https://prometheus.ceph.lab | — |
-| Alertmanager | https://alertmanager.ceph.lab | — |
+| ArgoCD | <https://argocd.ceph.lab> | admin / see `.env` (ARGOCD_BCRYPT_PASSWORD) |
+| Ceph Dashboard | <https://dashboard.ceph.lab> | admin / `kubectl -n rook-ceph get secret rook-ceph-dashboard-password -o jsonpath='{.data.password}' \| base64 -d` |
+| Grafana | <https://grafana.ceph.lab> | admin / prom-operator |
+| Hubble UI | <https://hubble.ceph.lab> | — |
+| Prometheus | <https://prometheus.ceph.lab> | — |
+| Alertmanager | <https://alertmanager.ceph.lab> | — |
 
 Run `bash provisioning/scripts/open_urls.sh` for a live summary including credentials.
 
@@ -211,6 +211,7 @@ All tuneable via `.env` (see `.env.example` for descriptions):
 - [ArgoCD Documentation](https://argo-cd.readthedocs.io/en/stable/)
 
 See also:
+
 - [docs/ceph-cheatsheet.md](docs/ceph-cheatsheet.md) — quick Ceph command reference
 - [docs/gitops-argocd-lessons.md](docs/gitops-argocd-lessons.md) — hard-won GitOps/ArgoCD lessons and the OutOfSync debugging playbook
 - [docs/observability-tour.md](docs/observability-tour.md) — guided walkthrough of the LGTM + Hubble observability stack
