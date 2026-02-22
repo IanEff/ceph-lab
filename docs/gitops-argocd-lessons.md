@@ -8,25 +8,31 @@ Each section describes the symptom, root cause, and fix so future bringups are f
 ## 1. Rook Toolbox: `ceph.conf` empty and malformed keyring
 
 ### Symptom
+
 ```
 mon host =                 # empty
 [client.admin]AQ...==      # keyring key and section header concatenated
 ```
+
 `ceph status` fails with auth errors from inside the toolbox pod.
 
 ### Root Cause
+
 The toolbox startup script used `grep ^data` to parse the mon-endpoints ConfigMap, but the
 ConfigMap value has no `data=` prefix — it's a raw CSV like `a=1.2.3.4:6789,b=1.2.3.5:6789`.
 
 The keyring-writing step did:
+
 ```bash
 cat /var/lib/rook/client.admin.keyring > /etc/ceph/keyring
 echo "[client.admin]" >> /etc/ceph/keyring
 cat /var/lib/rook/client.admin.keyring >> /etc/ceph/keyring
 ```
+
 …which wrote the raw base64 blob directly, then appended the section header *after* it.
 
 ### Fix (`applications/rook/cluster/toolbox.yaml`)
+
 ```bash
 # Parse mon endpoints correctly (file has no "data=" prefix)
 MON_ENDPOINTS=$(cat /etc/rook/mon-endpoints | tr ',' '\n' | awk -F= '{print $2}' | paste -sd,)
@@ -40,13 +46,16 @@ printf '[client.admin]\n\tkey = %s\n' "${CEPH_SECRET}" > /etc/ceph/keyring
 ## 2. Ceph `HEALTH_WARN mon clock skew`
 
 ### Symptom
+
 ```
 HEALTH_WARN: clock skew detected on mon.c
 mon.c clock skew 56ms > max 50ms
 ```
+
 (Can climb to 100ms+ on VirtualBox hosts under load.)
 
 ### Root Cause
+
 VirtualBox VM clocks drift more than Ceph's default 50ms `mon_clock_drift_allowed` threshold.
 Restarting `systemd-timesyncd` on the affected VM helps temporarily but drift returns.
 
@@ -64,6 +73,7 @@ spec:
 
 **Do NOT use `configOverride`** — that field was removed from the CRD schema in Rook v1.17.
 ArgoCD will report a `ComparisonError` with:
+
 ```
 ValidationError(CephCluster.spec): unknown field "configOverride"
 ```
@@ -75,12 +85,14 @@ The correct field is `spec.cephConfig.<section>.<key>: "value"`.
 ## 3. Gateway API manifests permanently OutOfSync in ArgoCD
 
 ### Symptom
+
 Apps containing `HTTPRoute`, `GRPCRoute`, or `Gateway` resources are always `OutOfSync`
 even though the resources are `Healthy` and functioning correctly.
 ArgoCD self-heal keeps running (`autoHealAttemptsCount` climbing) and always reports "Synced"
 — then immediately flips back to OutOfSync.
 
 ### Root Cause
+
 The Gateway API admission webhook **normalises resources on write** by injecting default
 field values that are not present in the source manifests:
 
@@ -95,6 +107,7 @@ normalised live object, so it always sees a diff. Self-heal applies the manifest
 webhook re-injects the defaults, and the cycle repeats forever.
 
 ### What does NOT work
+
 - `ServerSideDiff=true` — ArgoCD then uses `kubectl apply --server-side --dry-run` for the
   diff, which also causes the tracking-id annotation (`argocd.argoproj.io/tracking-id`) to
   appear in the diff.
@@ -107,6 +120,7 @@ webhook re-injects the defaults, and the cycle repeats forever.
 Add the injected defaults to the source YAML so git matches what the API server stores.
 
 **HTTPRoute / GRPCRoute backendRefs:**
+
 ```yaml
 rules:
   - matches:                          # required on every rule
@@ -122,6 +136,7 @@ rules:
 ```
 
 **GRPCRoute** (does not default `matches`, only backendRefs fields):
+
 ```yaml
 rules:
   - backendRefs:
@@ -133,6 +148,7 @@ rules:
 ```
 
 **Filter-only HTTPRoute rules** (no backendRefs, but `matches` is still injected):
+
 ```yaml
 rules:
   - matches:
@@ -147,6 +163,7 @@ rules:
 ```
 
 **Gateway `tls.certificateRefs`:**
+
 ```yaml
 tls:
   mode: Terminate
@@ -276,12 +293,14 @@ The most direct approach is to see what ArgoCD actually considers different. The
 ways depending on your ArgoCD sync mode:
 
 **Client-side diff (default):**
+
 ```bash
 # See what kubectl would change if ArgoCD applied the manifest right now
 kubectl --context=<ctx> diff -f <path-to-rendered-manifest.yaml>
 ```
 
 **Server-side diff (if `ServerSideApply=true` is in syncOptions):**
+
 ```bash
 # Simulate what the API server would produce, using ArgoCD's field manager
 kubectl --context=<ctx> diff \
@@ -307,6 +326,7 @@ This is expected and correct behaviour; the problem is only that your source man
 doesn't reflect it.
 
 To see the canonical stored form:
+
 ```bash
 kubectl --context=<ctx> -n <namespace> get <kind> <name> -o yaml
 ```
@@ -343,6 +363,7 @@ two options:
 **Option A (preferred): switch to ServerSideApply** — this uses server-side apply which
 doesn't write `last-applied-configuration`, and ArgoCD's tracking annotation is handled
 differently. Add to `syncOptions`:
+
 ```yaml
 syncOptions:
   - ServerSideApply=true
@@ -351,6 +372,7 @@ syncOptions:
 **Option B (last resort): `ignoreDifferences`** — suppresses the diff in ArgoCD's
 comparison without fixing the underlying cause. Use only for fields you genuinely cannot
 control (e.g. operator-managed status subresources):
+
 ```yaml
 ignoreDifferences:
   - group: some.api.group
@@ -374,6 +396,7 @@ tightly to the exact path. Also consider `prune: false` + `selfHeal: false` for 
 whose lifecycle is entirely owned by an operator (e.g. `CephCluster`).
 
 Example from `rook-cluster.yaml`:
+
 ```yaml
 ignoreDifferences:
   - group: ceph.rook.io
@@ -392,15 +415,19 @@ After updating manifests:
 1. Commit and push to git.
 2. Force a hard refresh so ArgoCD re-fetches from git immediately (rather than waiting for
    the poll interval):
+
    ```bash
    kubectl --context=<ctx> -n argocd patch app <name> \
      --type merge \
      -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'
    ```
+
 3. Wait ~30 seconds, then check:
+
    ```bash
    kubectl --context=<ctx> -n argocd get applications
    ```
+
 4. If the app goes `Synced` and stays there through the next reconcile cycle (~3 minutes),
    the fix is solid. If it flips back to OutOfSync, return to Step 3 — there's another
    field being injected that you haven't captured yet.
