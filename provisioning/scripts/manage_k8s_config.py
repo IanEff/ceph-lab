@@ -116,7 +116,7 @@ def remove_ssh_config() -> None:
 # ── kubeconfig helpers ────────────────────────────────────────────────────────
 
 
-def fetch_kubeconfig(retries: int = 6, delay: float = 10.0) -> str:
+def fetch_kubeconfig(retries: int = 6, delay: float = 10.0) -> str:  # type: ignore
     """SCP the kubeconfig directly from the control plane using its Vagrant key."""
     keys = scan_vms()
     key_path = keys.get("ceph-control")
