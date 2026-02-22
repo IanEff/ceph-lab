@@ -241,6 +241,79 @@ def remove_kube_config() -> None:
     print(f"  Removed kubeconfig context/cluster/user for {CONTEXT_NAME}")
 
 
+# ── CA trust helper ───────────────────────────────────────────────────────────
+
+
+def trust_ca() -> None:
+    """Extract the fixed ceph-lab CA cert and trust it in the macOS System Keychain.
+
+    Because the CA keypair is committed to the repo and never regenerated, this
+    only needs to take effect once — the fingerprint check prevents re-prompting
+    for sudo on subsequent 'manage_k8s_config.py add' calls.
+    """
+    import tempfile as _tmpfile
+
+    cert_file = Path(_tmpfile.gettempdir()) / "ceph-lab-ca.crt"
+
+    print("  Extracting ceph-lab CA cert...")
+    try:
+        result = subprocess.run(
+            [
+                "kubectl", "get", "secret", "ceph-lab-ca-keypair",
+                "-n", "cert-manager",
+                "--context", CONTEXT_NAME,
+                "-o", "jsonpath={.data.tls\\.crt}",
+            ],
+            capture_output=True, text=True, check=True,
+        )
+    except subprocess.CalledProcessError:
+        print("  WARNING: ceph-lab-ca-keypair secret not found — cert-manager may still be syncing.")
+        print("  Run 'bash provisioning/scripts/trust_ca.sh' after the cluster is ready.")
+        return
+
+    import base64 as _b64
+    cert_pem = _b64.b64decode(result.stdout.strip()).decode()
+    cert_file.write_text(cert_pem)
+
+    # Check if already trusted
+    fp_result = subprocess.run(
+        ["openssl", "x509", "-noout", "-fingerprint", "-sha256", "-in", str(cert_file)],
+        capture_output=True, text=True,
+    )
+    fingerprint = fp_result.stdout.split("=", 1)[-1].strip().replace(":", "").upper()
+
+    already_trusted = False
+    try:
+        certs_result = subprocess.run(
+            ["security", "find-certificate", "-Z", "-a", "/Library/Keychains/System.keychain"],
+            capture_output=True, text=True,
+        )
+        if fingerprint in certs_result.stdout.upper():
+            already_trusted = True
+    except Exception:
+        pass
+
+    if already_trusted:
+        print("  CA cert already trusted in System Keychain — skipping.")
+        return
+
+    print("  Trusting CA cert in macOS System Keychain (requires sudo)...")
+    try:
+        subprocess.run(
+            [
+                "sudo", "security", "add-trusted-cert",
+                "-d", "-r", "trustRoot",
+                "-k", "/Library/Keychains/System.keychain",
+                str(cert_file),
+            ],
+            check=True,
+        )
+        print("  CA cert trusted. *.ceph.lab TLS will be valid in browsers and argocd CLI.")
+    except subprocess.CalledProcessError:
+        print("  WARNING: Failed to trust CA cert. Run manually:")
+        print(f"    sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain {cert_file}")
+
+
 # ── Entrypoint ────────────────────────────────────────────────────────────────
 
 
@@ -259,6 +332,7 @@ def main() -> None:
         update_ssh_config(keys)
         if keys.get("ceph-control"):
             add_kube_config()
+            trust_ca()
         else:
             print("  WARNING: ceph-control not found; skipping kubeconfig merge.")
         print("Done.")

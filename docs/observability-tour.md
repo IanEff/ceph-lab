@@ -36,12 +36,12 @@ self-signed wildcard for `*.ceph.lab`.**
 
 | Service        | URL                                 | Credentials           |
 |----------------|-------------------------------------|-----------------------|
-| Grafana        | https://grafana.ceph.lab            | admin / password      |
-| Prometheus     | https://prometheus.ceph.lab         | (none)                |
-| Alertmanager   | https://alertmanager.ceph.lab       | (none)                |
-| Ceph Dashboard | https://dashboard.ceph.lab          | admin / (see below)   |
-| Hubble UI      | https://hubble.ceph.lab             | (none)                |
-| ArgoCD         | https://argocd.ceph.lab             | admin / (see below)   |
+| Grafana        | <https://grafana.ceph.lab>            | admin / password      |
+| Prometheus     | <https://prometheus.ceph.lab>         | (none)                |
+| Alertmanager   | <https://alertmanager.ceph.lab>       | (none)                |
+| Ceph Dashboard | <https://dashboard.ceph.lab>          | admin / (see below)   |
+| Hubble UI      | <https://hubble.ceph.lab>             | (none)                |
+| ArgoCD         | <https://argocd.ceph.lab>             | admin / (see below)   |
 
 ```bash
 # Retrieve the Ceph dashboard password
@@ -57,7 +57,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
 
 ## Grafana
 
-**https://grafana.ceph.lab**
+**<https://grafana.ceph.lab>**
 
 The primary window into everything.  Three datasources are pre-configured and
 cross-linked so you can jump from a metric spike → the logs that caused it →
@@ -72,6 +72,7 @@ a trace that explains the path.
 | Tempo      | `tempo`      | `tempo.tracing:3100`                                |
 
 Cross-datasource links are wired:
+
 - **Loki → Tempo**: any log line containing `traceID=<hex>` becomes a clickable link
   to the matching Tempo trace.
 - **Tempo → Prometheus**: service map node click opens the Prometheus metrics for
@@ -85,6 +86,7 @@ Grafana's sidecar auto-imports ConfigMaps labelled `grafana_dashboard=1` from ev
 namespace.  Here's what's loaded at boot:
 
 #### Ceph / Rook (namespace: `rook-ceph`)
+
 | Dashboard                  | What to look for                                         |
 |----------------------------|----------------------------------------------------------|
 | **Ceph Cluster**           | Cluster health, IOPS, throughput, capacity, PG states    |
@@ -92,6 +94,7 @@ namespace.  Here's what's loaded at boot:
 | **Ceph Pools**             | Per-pool read/write bandwidth, object counts, PG distribution |
 
 #### Cilium / Hubble (namespace: `monitoring`)
+
 | Dashboard                  | What to look for                                         |
 |----------------------------|----------------------------------------------------------|
 | **Cilium Overview**        | Drop rates, policy verdicts, endpoint health             |
@@ -101,6 +104,7 @@ namespace.  Here's what's loaded at boot:
 | **Cilium Operator**        | Operator reconciliation latency, error rate              |
 
 #### Kubernetes / Infrastructure (kube-prometheus-stack defaults)
+
 | Dashboard                  | What to look for                                         |
 |----------------------------|----------------------------------------------------------|
 | **Kubernetes / Nodes**     | CPU, memory, disk I/O — per node                         |
@@ -221,7 +225,7 @@ node to see its RED metrics (Rate, Errors, Duration) as Prometheus charts.
 
 ## Prometheus
 
-**https://prometheus.ceph.lab**
+**<https://prometheus.ceph.lab>**
 
 Most useful for ad-hoc metric exploration and alert debugging outside of Grafana.
 
@@ -289,7 +293,7 @@ sort_desc(sum by (reason) (rate(hubble_drop_total[5m])))
 
 ## Alertmanager
 
-**https://alertmanager.ceph.lab**
+**<https://alertmanager.ceph.lab>**
 
 Alertmanager shows every firing `PrometheusRule` alert grouped by its labels.
 
@@ -326,7 +330,7 @@ kubectl exec -n monitoring deploy/kube-prometheus-stack-alertmanager \
 
 ## Ceph Dashboard
 
-**https://dashboard.ceph.lab**
+**<https://dashboard.ceph.lab>**
 
 Native Ceph UI served by the MGR's dashboard module.  Different from Grafana — this talks
 directly to the Ceph daemons (not Prometheus) so it shows real-time state that Prometheus
@@ -335,41 +339,49 @@ may lag on.
 ### Sections worth visiting
 
 #### Home
+
 Live cluster health, capacity donut, active alerts, and a Prometheus-backed I/O sparkline
 (now wired to the internal Prometheus instance — look for the "IOPS" and "Throughput" tiles
 on the top row; they should show live data, not `N/A`).
 
 #### OSDs
+
 - **OSD List**: each OSD shows device class, capacity, read/write ops, latency, and
   `in`/`up` status.  Click an OSD to see its full performance history.
 - **Performance Details**: individual OSD commit/apply latency histograms.
 
 #### Pools
+
 Per-pool read/write bandwidth, objects stored, compression ratio, and PG distribution.
 
 #### Block Storage (RBD)
+
 List all RBD images across all pools.  Snapshot creation/deletion, image sizes, and
 current I/O stats per image.
 
 #### Filesystem (CephFS)
+
 MDS daemon status, active/standby roles, per-client I/O.
 
 #### Object Storage (RGW)
+
 Bucket list, per-user quota usage.  The S3 endpoint is active on port 80 inside the
 cluster — see the `ceph-clients` namespace CiliumNetworkPolicy for access rules.
 
 #### Logs (Live)
+
 Streams the MGR log directly.  Much lower latency than Loki — use this during active
 operations to see what decisions the MGR is making in real-time.
 
 #### Administration → Cluster → CRUSH Map
+
 Interactive CRUSH hierarchy viewer showing OSD weights, bucket types, and failure domains.
 
 ---
 
 ## Hubble UI
 
-**https://hubble.ceph.lab**
+**<https://hubble.ceph.lab>**
 
 Real-time network flow visibility into every connection in the cluster.
 
@@ -394,6 +406,7 @@ Particularly interesting namespaces:
 
 Click any edge in the service map to open the **flow table** below it.  Each row is an
 individual connection with:
+
 - Source pod / namespace
 - Destination pod / namespace / port
 - Protocol (TCP / UDP / ICMP / HTTP / DNS)
@@ -454,7 +467,7 @@ Here's the full observability chain in practice.  Scenario: **an OSD is slow**.
 
 ### 1. Ceph Dashboard (immediate triage)
 
-Open **https://dashboard.ceph.lab → OSDs**.  Find the OSD with high latency in the per-OSD
+Open **<https://dashboard.ceph.lab> → OSDs**.  Find the OSD with high latency in the per-OSD
 table.  Note the OSD number (e.g. `osd.2`).
 
 ### 2. Grafana: Ceph OSD Single Dashboard
@@ -498,7 +511,7 @@ network side.
 
 ### 6. Alertmanager: was an alert fired?
 
-Open **https://alertmanager.ceph.lab** — if `CephOSDNearFull` or `CephPGsDegraded` fired
+Open **<https://alertmanager.ceph.lab>** — if `CephOSDNearFull` or `CephPGsDegraded` fired
 during the window, it'll appear here with its exact start time.  That pins the timeline.
 
 ---

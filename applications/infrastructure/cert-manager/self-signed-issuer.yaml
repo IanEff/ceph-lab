@@ -1,37 +1,14 @@
 # Bootstrap PKI for *.ceph.lab TLS:
-#   selfsigned ClusterIssuer → ceph-lab-ca Certificate → ceph-lab-ca ClusterIssuer
+#   ceph-lab-ca-keypair Secret (committed, fixed) → ceph-lab-ca ClusterIssuer
+#
+# The CA keypair is pre-generated and committed to the repo (ceph-lab-ca-secret.yaml).
+# This means the SAME CA is used on every cluster rebuild — trust it once:
+#   bash provisioning/scripts/trust_ca.sh
 #
 # The ceph-lab-ca ClusterIssuer signs the gateway-tls wildcard cert.
-# Import the CA into your browser/macOS keychain to avoid TLS warnings:
-#   kubectl -n cert-manager get secret ceph-lab-ca-keypair \
-#       -o jsonpath='{.data.tls\.crt}' | base64 -d > ceph-lab-ca.crt
-#   sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ceph-lab-ca.crt
+# There is intentionally NO cert-manager Certificate resource for the CA itself —
+# that would cause cert-manager to regenerate the CA on each rebuild.
 
----
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: selfsigned
-spec:
-  selfSigned: {}
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: ceph-lab-ca
-  namespace: cert-manager
-spec:
-  isCA: true
-  duration: 87600h   # 10 years
-  commonName: ceph-lab-ca
-  secretName: ceph-lab-ca-keypair
-  privateKey:
-    algorithm: ECDSA
-    size: 256
-  issuerRef:
-    name: selfsigned
-    kind: ClusterIssuer
-    group: cert-manager.io
 ---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer

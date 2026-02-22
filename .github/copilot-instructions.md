@@ -129,7 +129,7 @@ cluster-bootstrap/
   argocd/           # ArgoCD install patches (insecure, --enable-helm, limits)
   bootstrap/        # root-app.yaml — the seed Application applied by install_argocd.sh
 provisioning/scripts/ # VM provisioning + host-side helpers
-docs/               # ceph-cheatsheet.md for quick Ceph command reference
+docs/               # ceph-cheatsheet.md, gitops-argocd-lessons.md, observability-tour.md
 ```
 
 ---

@@ -197,6 +197,7 @@ All tuneable via `.env` (see `.env.example` for descriptions):
 | `ROOK_VERSION` | v1.19.1 | Rook Helm chart version |
 | `CILIUM_VERSION` | 1.18.2 | Cilium Helm chart version |
 | `GATEWAY_API_VERSION` | v1.4.1 | Gateway API CRD version |
+| `ARGOCD_VERSION` | stable | ArgoCD install channel or tag |
 
 ---
 
@@ -209,7 +210,10 @@ All tuneable via `.env` (see `.env.example` for descriptions):
 - [Cilium Documentation](https://docs.cilium.io/en/stable/)
 - [ArgoCD Documentation](https://argo-cd.readthedocs.io/en/stable/)
 
-See also [docs/ceph-cheatsheet.md](ceph-cheatsheet.md) for quick command reference.
+See also:
+- [docs/ceph-cheatsheet.md](docs/ceph-cheatsheet.md) — quick Ceph command reference
+- [docs/gitops-argocd-lessons.md](docs/gitops-argocd-lessons.md) — hard-won GitOps/ArgoCD lessons and the OutOfSync debugging playbook
+- [docs/observability-tour.md](docs/observability-tour.md) — guided walkthrough of the LGTM + Hubble observability stack
 
 ---
 

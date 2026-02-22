@@ -5,3 +5,4 @@ resources:
   - block-pool.yaml
   - filesystem.yaml
   - object-store.yaml
+  - warp-obc.yaml
