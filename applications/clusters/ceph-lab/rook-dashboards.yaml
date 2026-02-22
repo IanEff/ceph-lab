@@ -16,7 +16,7 @@ spec:
     targetRevision: HEAD
     path: applications/rook/dashboards
   destination:
-    server: https://kubernetes.default.svc
+    server: https://kubernetes    argocd login argocd.ceph.lab --username admin --password password --grpc-web --insecure.default.svc
     namespace: rook-ceph
   syncPolicy:
     automated:
