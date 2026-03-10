@@ -40,3 +40,6 @@ sealed-secrets-key*.yaml
 # Deploy keys
 deploy_ceph-lab
 deploy_ceph-lab.pub
+
+# Claude Code project config (personal tool settings)
+.claude/

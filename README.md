@@ -9,8 +9,7 @@
   ╚═════╝╚══════╝╚═╝     ╚═╝  ╚═╝      ╚══════╝╚═╝  ╚═╝╚═════╝
 ```
 
-A fully-gitopsed Rook/Ceph playground on k3s — because you deserve a cluster
-that provisions itself while you read the [Mastering Ceph](https://www.packtpub.com/product/mastering-ceph/9781785888786) book.
+A fully-gitopsed Rook/Ceph playground on k3s - a sandbox to play around with ceph, kubernetes, Cilium, et cetera.  Ceph traffic prettily lit up in Hubble.
 
 ---
 
