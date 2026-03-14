@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: rook-ceph
+
+# Extends the base cluster definition with aggressive recovery throttles.
+# Point rook-cluster.yaml at this path to enter maintenance posture;
+# point it back at applications/rook/cluster to return to normal.
+resources:
+  - ../../
+
+patches:
+  - path: cephconfig-patch.yaml
+    target:
+      group: ceph.rook.io
+      version: v1
+      kind: CephCluster
+      name: rook-ceph

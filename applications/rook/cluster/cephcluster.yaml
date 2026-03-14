@@ -51,11 +51,19 @@ spec:
       requireMsgr2: true
 
   # ── Ceph config overrides ─────────────────────────────────────────────────
-  # Raise clock drift tolerance to 100ms — VMs commonly drift more than the
-  # default 50ms, causing spurious HEALTH_WARN on mon.c after restarts.
+  # Raise clock drift tolerance — VMs commonly drift more than the default
+  # 50ms, causing spurious HEALTH_WARN on mon.c after restarts.
+  #
+  # OSD recovery/backfill throttles are set conservatively here so recovery
+  # happens quietly in the background without competing with client I/O.
+  # See applications/rook/cluster/overlays/maintenance/ to shift posture.
   cephConfig:
     mon:
       mon_clock_drift_allowed: "0.5"
+    osd:
+      osd_max_backfills: "1"
+      osd_recovery_max_active: "1"
+      osd_recovery_op_priority: "3"
 
   # ── Ops safety ────────────────────────────────────────────────────────────
   crashCollector:

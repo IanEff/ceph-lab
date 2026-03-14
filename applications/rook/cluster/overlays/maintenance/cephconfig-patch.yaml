@@ -1,0 +1,21 @@
+# Strategic merge patch — maintenance posture.
+#
+# Replaces the entire cephConfig block, so mon settings must be
+# repeated here alongside the OSD overrides. Both postures carry
+# the full picture; nothing is left to inference.
+#
+# To revert: point rook-cluster.yaml back at applications/rook/cluster
+# and sync. The base conservative values take over immediately.
+apiVersion: ceph.rook.io/v1
+kind: CephCluster
+metadata:
+  name: rook-ceph
+  namespace: rook-ceph
+spec:
+  cephConfig:
+    mon:
+      mon_clock_drift_allowed: "0.5"
+    osd:
+      osd_max_backfills: "4"
+      osd_recovery_max_active: "4"
+      osd_recovery_op_priority: "63"
