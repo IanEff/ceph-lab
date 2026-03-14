@@ -14,7 +14,9 @@ GitOps-first walkthrough for standing up object storage, wiring external S3 acce
 
 ## Wave 30 — object store
 
-### `gitops/rook/storage/object-store.yaml`
+> **Ref:** [CephObjectStore CRD](https://rook.io/docs/rook/latest/CRDs/Object-Store/ceph-object-store-crd/) · [Object storage setup](https://rook.io/docs/rook/latest/Storage-Configuration/Object-Storage-RGW/object-storage/)
+
+### `applications/rook/storage/object-store.yaml`
 
 ```yaml
 apiVersion: ceph.rook.io/v1
@@ -76,42 +78,63 @@ kubectl exec -it -n rook-ceph deploy/rook-ceph-tools -- ceph status
 
 ---
 
-## Wave 31 — expose RGW externally
+## Wave 35 — expose RGW externally
 
-### `gitops/rook/gateway/rgw-httproute.yaml`
+> **Ref:** [Expose Object Store](https://rook.io/docs/rook/latest/Storage-Configuration/Object-Storage-RGW/object-storage/#create-the-object-store)
+
+### `applications/rook/gateway/httproute-s3.yaml`
+
+This file already exists in the repo. Copy of canonical content for reference:
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: rgw-s3
+  name: ceph-s3
   namespace: rook-ceph
 spec:
   parentRefs:
-    - name: cilium-gateway        # adjust to your actual Gateway name
-      namespace: rook-ceph
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: cilium-gateway
+      namespace: kube-system      # Gateway lives in kube-system, not rook-ceph
+      sectionName: https          # TLS-terminating listener; backend is cleartext HTTP
   hostnames:
     - s3.ceph.lab
   rules:
-    - backendRefs:
-        - name: rook-ceph-rgw-ceph-objectstore
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: rook-ceph-rgw-ceph-objectstore
           port: 80
+          weight: 1
 ```
+
+> **Important:** All Gateway API-defaulted fields (`group`, `kind`, `weight`, `matches`) must be present verbatim. The admission webhook injects them and ArgoCD will loop OutOfSync forever if they are omitted. See `docs/gitops-argocd-lessons.md` §3.
 
 Verify DNS and connectivity from your Mac:
 
 ```bash
-curl -v http://s3.ceph.lab/
+curl -v https://s3.ceph.lab/
 # expect an empty ListAllMyBuckets XML response or 403 — either means RGW is reachable
+# If you hit a TLS error, run: bash provisioning/scripts/trust_ca.sh
 ```
 
 ---
 
-## Wave 31 — admin user for external access
+## Wave 30 — admin user for external access
+
+> **Ref:** [CephObjectStoreUser CRD](https://rook.io/docs/rook/latest/CRDs/Object-Store/ceph-object-store-user-crd/)
 
 OBCs create per-bucket subusers scoped to that bucket — not useful for external CLI work. Create a named user instead.
 
-### `gitops/rook/storage/objectstore-user.yaml`
+### `applications/rook/storage/objectstore-user.yaml`
+
+> **Note:** This file does not yet exist in the repo. Create it and add it to `applications/rook/storage/kustomization.yaml`.
 
 ```yaml
 apiVersion: ceph.rook.io/v1
@@ -161,9 +184,11 @@ Shell alias (fish or bash):
 
 ```bash
 # add to config.fish / .bashrc
-set -x S3_ENDPOINT_URL "http://s3.ceph.lab"
+set -x S3_ENDPOINT_URL "https://s3.ceph.lab"
 alias s5="s5cmd --credentials-file ~/.aws/credentials --profile ceph-lab"
 ```
+
+> TLS is terminated at the Cilium Gateway. If you haven't trusted the lab CA yet, run `bash provisioning/scripts/trust_ca.sh` first, or append `--no-verify-ssl` to s5cmd calls.
 
 Smoke test:
 
@@ -180,20 +205,39 @@ s5 rb s3://test-busket               # remove bucket (must be empty)
 
 ## GitOps bucket creation via OBC
 
+> **Ref:** [Object Bucket Claim](https://rook.io/docs/rook/latest/Storage-Configuration/Object-Storage-RGW/object-bucket-claim/)
+
 For buckets that belong to workloads living inside the cluster, the GitOps path is an `ObjectBucketClaim`. The provisioner creates the bucket and drops connection info into the same namespace.
 
-### `gitops/apps/<appname>/bucket.yaml`
+### `applications/rook/storage/<appname>-obc.yaml`
+
+Two `spec` variants — use whichever fits your workload:
 
 ```yaml
+# Fixed bucket name (predictable, but fails if the name already exists)
 apiVersion: objectbucket.io/v1alpha1
 kind: ObjectBucketClaim
 metadata:
   name: my-bucket
   namespace: my-app          # must match consuming pod's namespace
 spec:
-  bucketName: my-bucket      # actual S3 bucket name
+  bucketName: my-bucket      # exact S3 bucket name
   storageClassName: rook-ceph-bucket
 ```
+
+```yaml
+# Generated bucket name (safe for re-deploy; actual name read from ConfigMap BUCKET_NAME)
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: my-bucket
+  namespace: my-app
+spec:
+  generateBucketName: my-bucket  # prefix; Rook appends a random suffix
+  storageClassName: rook-ceph-bucket
+```
+
+The existing `applications/rook/storage/warp-obc.yaml` uses `generateBucketName`.
 
 After reconcile, in `my-app` namespace:
 
