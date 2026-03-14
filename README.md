@@ -44,7 +44,7 @@ A fully-gitopsed Rook/Ceph playground on k3s - a sandbox to play around with cep
      │  ceph-node-1/2/3  :61/:62/:63          │
      │  k3s agents + Ceph OSDs                │
      │  3 vCPU / 6 GB each                    │
-     │  /dev/sdc + /dev/sdd (50 GB, raw)       │
+     │  /dev/sdc + /dev/sdd (10 GB, raw)       │
      └────────────────────────────────────────┘
                │
      ┌─────────▼──────────────────────────────┐

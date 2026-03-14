@@ -9,7 +9,7 @@ A Rook/Ceph playground on k3s, fully managed by ArgoCD GitOps. One `vagrant up` 
 | Node | IP | Role |
 |---|---|---|
 | `ceph-control` | `192.168.56.50` | k3s server, 2vCPU/3GB |
-| `ceph-node-{1,2,3}` | `192.168.56.{61,62,63}` | k3s agents + Ceph OSDs, 3vCPU/6GB |
+| `ceph-node-{1,2,3}` | `192.168.56.{61,62,63}` | k3s agents + Ceph OSDs, 3vCPU/6GB + 2x 10GB OSDs |
 | Cilium Gateway | `192.168.56.200` | L2 LB (pool `192.168.56.192/27`) |
 
 DNS: `*.ceph.lab → 192.168.56.200` via macOS dnsmasq.

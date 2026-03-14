@@ -10,9 +10,9 @@
 # Topology
 # ────────
 #   ceph-control   192.168.56.50   k3s server  2 vCPU / 3 GB
-#   ceph-node-1    192.168.56.61   k3s agent   3 vCPU / 6 GB  + 2× 50 GB OSDs
-#   ceph-node-2    192.168.56.62   k3s agent   3 vCPU / 6 GB  + 2× 50 GB OSDs
-#   ceph-node-3    192.168.56.63   k3s agent   3 vCPU / 6 GB  + 2× 50 GB OSDs
+#   ceph-node-1    192.168.56.61   k3s agent   3 vCPU / 6 GB  + 2× 10 GB OSDs
+#   ceph-node-2    192.168.56.62   k3s agent   3 vCPU / 6 GB  + 2× 10 GB OSDs
+#   ceph-node-3    192.168.56.63   k3s agent   3 vCPU / 6 GB  + 2× 10 GB OSDs
 #
 # Key env vars (see .env.example / .envrc):
 #   GITOPS_REPO_URL          — your fork of this repo (for ArgoCD)

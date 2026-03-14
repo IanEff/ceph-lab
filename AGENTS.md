@@ -107,7 +107,7 @@ These are intentional to protect Ceph data from accidental ArgoCD deletes.
 | Node | IP | Role |
 |---|---|---|
 | `ceph-control` | `192.168.56.50` | k3s server, 2 vCPU / 3 GB |
-| `ceph-node-{1,2,3}` | `192.168.56.{61,62,63}` | k3s agents + Ceph OSDs, 3 vCPU / 6 GB |
+| `ceph-node-{1,2,3}` | `192.168.56.{61,62,63}` | k3s agents + Ceph OSDs, 3 vCPU / 6 GB + 2x 10 GB OSDs |
 | Cilium Gateway | `192.168.56.200` | L2 LB, pool `192.168.56.192/27` |
 
 DNS: `*.ceph.lab → 192.168.56.200` via macOS dnsmasq.
@@ -160,6 +160,8 @@ python3 provisioning/scripts/manage_k8s_config.py remove && vagrant destroy -f
 
 ## Further reading
 
+- [GEMINI.md](GEMINI.md) — specialized instructions for Gemini CLI
+- [CLAUDE.md](CLAUDE.md) — specialized instructions for Claude
 - [.github/copilot-instructions.md](.github/copilot-instructions.md) — full coding conventions and gotchas
 - [docs/gitops-argocd-lessons.md](docs/gitops-argocd-lessons.md) — OutOfSync debugging playbook
 - [docs/observability-tour.md](docs/observability-tour.md) — observability stack walkthrough
