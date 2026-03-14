@@ -74,7 +74,7 @@ Or just push the revert commit and let ArgoCD pick it up on the next poll.
 
 ## Why not hooks?
 
-ArgoCD PreSync/PostSync hooks can also run `ceph config set`. They're the right tool when you need a config change *coupled to another deployment event* — e.g., loosen throttles before applying an OSD replacement, tighten them after. That's a workflow with sequencing logic, and Argo Workflows (not ArgoCD hooks) is the correct tool for that.
+ArgoCD PreSync/PostSync hooks can also run `ceph config set`. They're the right tool when you need a config change _coupled to another deployment event_ — e.g., loosen throttles before applying an OSD replacement, tighten them after. That's a workflow with sequencing logic, and Argo Workflows (not ArgoCD hooks) is the correct tool for that.
 
 This posture approach is for the simpler case: you want the cluster in a known configuration, you want git to say what that configuration is, and you want the revert to be a single merge. No hooks, no timers, no "did the PostSync job actually finish?" anxiety. Just state.
 
