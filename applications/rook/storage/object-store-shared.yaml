@@ -1,0 +1,26 @@
+apiVersion: ceph.rook.io/v1
+kind: CephObjectStore
+metadata:
+  name: ceph-shared-objectstore
+  namespace: rook-ceph # namespace:cluster
+spec:
+  sharedPools:
+    metadataPoolName: rgw-meta-pool
+    dataPoolName: rgw-data-pool
+    dataNonECPoolName: rgw-nonec-pool
+    preserveRadosNamespaceDataOnDelete: true
+  gateway:
+    # sslCertificateRef:
+    port: 80
+    instances: 1
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: rook-ceph-communal-bucket
+# Change "rook-ceph" provisioner prefix to match the operator namespace if needed
+provisioner: rook-ceph.ceph.rook.io/bucket
+reclaimPolicy: Delete
+parameters:
+  objectStoreName: ceph-shared-objectstore
+  objectStoreNamespace: rook-ceph
