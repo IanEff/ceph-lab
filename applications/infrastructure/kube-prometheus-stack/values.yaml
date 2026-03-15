@@ -26,30 +26,7 @@ kube-prometheus-stack:
         url: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
         isDefault: true
         editable: true
-      - name: Loki
-        type: loki
-        uid: loki
-        url: http://loki.logging.svc.cluster.local:3100
-        editable: true
-        jsonData:
-          derivedFields:
-            - datasourceUid: tempo
-              matcherRegex: "traceID=(\\w+)"
-              name: TraceID
-              url: "$${__value.raw}"
-      - name: Tempo
-        type: tempo
-        uid: tempo
-        url: http://tempo.tracing.svc.cluster.local:3100
-        editable: true
-        jsonData:
-          httpMethod: GET
-          serviceMap:
-            datasourceUid: prometheus
-          nodeGraph:
-            enabled: true
-          lokiSearch:
-            datasourceUid: loki
+
 
   prometheus:
     prometheusSpec:
