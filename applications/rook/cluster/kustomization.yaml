@@ -4,7 +4,3 @@ namespace: rook-ceph
 resources:
   - cephcluster.yaml
   - toolbox.yaml
-  # Monitoring RBAC: allows operator + Prometheus SA to create/read ServiceMonitors
-  - monitoring-rbac.yaml
-  # PrometheusRules: ~40 Ceph health alerting rules (OSD down, near-full, quorum loss...)
-  - prometheus-rules.yaml

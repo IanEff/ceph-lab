@@ -1,12 +1,18 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "pyyaml",
+# ]
+# ///
 """
 ceph-lab — manage_k8s_config.py
 
 Add or remove the ceph-lab kubeconfig context and SSH entries on the macOS host.
 
 Usage:
-    python3 provisioning/scripts/manage_k8s_config.py add
-    python3 provisioning/scripts/manage_k8s_config.py remove
+    uv run provisioning/scripts/manage_k8s_config.py add
+    uv run provisioning/scripts/manage_k8s_config.py remove
 """
 
 import json
@@ -18,6 +24,8 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+
+import yaml
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 CONTROL_PLANE_IP = "192.168.56.50"
@@ -152,11 +160,29 @@ def fetch_kubeconfig(retries: int = 6, delay: float = 10.0) -> str:
 
 def rewrite_names(raw: str) -> str:
     """Rename the default context/cluster/user to ceph-lab-* names."""
-    raw = re.sub(r"\bcluster: default\b", f"cluster: {CLUSTER_NAME}", raw)
-    raw = re.sub(r"\buser: default\b", f"user: {USER_NAME}", raw)
-    raw = re.sub(r"\bname: default\b", f"name: {CONTEXT_NAME}", raw)
-    raw = re.sub(r"\bcurrent-context: default\b", f"current-context: {CONTEXT_NAME}", raw)
-    return raw
+    cfg = yaml.safe_load(raw)
+
+    for cluster in cfg.get("clusters") or []:
+        if cluster.get("name") == "default":
+            cluster["name"] = CLUSTER_NAME
+
+    for user in cfg.get("users") or []:
+        if user.get("name") == "default":
+            user["name"] = USER_NAME
+
+    for context in cfg.get("contexts") or []:
+        if context.get("name") == "default":
+            context["name"] = CONTEXT_NAME
+        ctx = context.get("context") or {}
+        if ctx.get("cluster") == "default":
+            ctx["cluster"] = CLUSTER_NAME
+        if ctx.get("user") == "default":
+            ctx["user"] = USER_NAME
+
+    if cfg.get("current-context") == "default":
+        cfg["current-context"] = CONTEXT_NAME
+
+    return yaml.dump(cfg, default_flow_style=False)
 
 
 def add_kube_config() -> None:
