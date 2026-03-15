@@ -7,7 +7,6 @@ spec:
   sharedPools:
     metadataPoolName: rgw-meta-pool
     dataPoolName: rgw-data-pool
-    dataNonECPoolName: rgw-nonec-pool
     preserveRadosNamespaceDataOnDelete: true
   gateway:
     # sslCertificateRef:
