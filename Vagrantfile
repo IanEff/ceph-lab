@@ -75,13 +75,13 @@ Vagrant.configure("2") do |config|
   config.trigger.after :up do |t|
     t.name    = "Merge kubeconfig (ceph-lab)"
     t.only_on = last_node
-    t.run     = { inline: "python3 #{File.dirname(__FILE__)}/provisioning/scripts/manage_k8s_config.py add" }
+    t.run     = { inline: "uv run #{File.dirname(__FILE__)}/provisioning/scripts/manage_k8s_config.py add" }
   end
 
   config.trigger.before :destroy do |t|
     t.name    = "Remove kubeconfig (ceph-lab)"
     t.only_on = last_node
-    t.run     = { inline: "python3 #{File.dirname(__FILE__)}/provisioning/scripts/manage_k8s_config.py remove" }
+    t.run     = { inline: "uv run #{File.dirname(__FILE__)}/provisioning/scripts/manage_k8s_config.py remove" }
   end
 
   if CONFIG[:configure_dnsmasq]
