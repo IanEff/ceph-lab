@@ -9,6 +9,7 @@ GitOps-first walkthrough for standing up object storage, wiring external S3 acce
 - ArgoCD waves 20–30 complete (`rook-ceph-operator`, `CephCluster` healthy)
 - `ceph status` reports `HEALTH_OK`
 - DNS: `*.ceph.lab` → `192.168.56.200` via dnsmasq
+- The `rook-ceph-tools` toolbox pod is deployed at **wave 30** (alongside rook-storage, not rook-cluster) — run `kubectl exec -it -n rook-ceph deploy/rook-ceph-tools -- ceph status` to verify
 
 ---
 
@@ -74,6 +75,71 @@ Verify:
 kubectl get svc -n rook-ceph | grep rgw
 kubectl exec -it -n rook-ceph deploy/rook-ceph-tools -- ceph status
 # expect osd pool stats showing .rgw.* pools
+```
+
+---
+
+## Wave 30 — shared-pool object store (`ceph-shared-objectstore`)
+
+> **Ref:** [Shared Pools CRD](https://rook.io/docs/rook/latest/CRDs/Object-Store/ceph-object-store-crd/#shared-pools)
+
+This pattern separates pool lifecycle from the object store. Pools are declared as standalone `CephBlockPool` resources and referenced by name — letting you use an erasure-coded data pool without Rook creating it inline.
+
+### `applications/rook/storage/object-shared-pools.yaml`
+
+Three pools underpin this store:
+
+| Pool | Type | Purpose |
+|---|---|---|
+| `rgw-meta-pool` | Replicated 3× | Bucket/object metadata, low-latency reads |
+| `rgw-data-pool` | Erasure Coded 2+1 | Bulk object data, space-efficient |
+| `rgw-nonec-pool` | Replicated 3× | Reserved for non-EC-capable objects |
+
+### `applications/rook/storage/object-store-shared.yaml`
+
+```yaml
+apiVersion: ceph.rook.io/v1
+kind: CephObjectStore
+metadata:
+  name: ceph-shared-objectstore
+  namespace: rook-ceph
+spec:
+  sharedPools:
+    metadataPoolName: rgw-meta-pool
+    dataPoolName: rgw-data-pool
+    preserveRadosNamespaceDataOnDelete: true
+  gateway:
+    port: 80
+    instances: 1
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: rook-ceph-communal-bucket
+provisioner: rook-ceph.ceph.rook.io/bucket
+reclaimPolicy: Delete
+parameters:
+  objectStoreName: ceph-shared-objectstore
+  objectStoreNamespace: rook-ceph
+```
+
+RGW service: `rook-ceph-rgw-ceph-shared-objectstore` in namespace `rook-ceph`.
+
+> **CRD gotcha — `dataNonECPoolName` does not exist.** `spec.sharedPools` in the installed Rook version only accepts `metadataPoolName`, `dataPoolName`, `poolPlacements`, and `preserveRadosNamespaceDataOnDelete`. Specifying `dataNonECPoolName` causes ArgoCD server-side apply to fail with: `dataNonECPoolName: field not declared in schema`.
+
+> **Cilium transient EPERM on first RGW start:** When a new `CephObjectStore`'s RGW pod first comes up, Cilium may not yet have propagated endpoint identity for it. The Rook operator's probe to the admin API (`http://rook-ceph-rgw-ceph-shared-objectstore.rook-ceph.svc:80/admin/user`) will transiently get `connect: operation not permitted`. OBC provisioning will succeed on the next retry (~2 min). No action required.
+
+Verify both stores are Ready:
+
+```bash
+kubectl get cephobjectstore -n rook-ceph
+# NAME                      PHASE
+# ceph-objectstore          Ready
+# ceph-shared-objectstore   Ready
+
+kubectl get svc -n rook-ceph | grep rgw
+# rook-ceph-rgw-ceph-objectstore         ClusterIP  ...  80/TCP
+# rook-ceph-rgw-ceph-shared-objectstore  ClusterIP  ...  80/TCP
 ```
 
 ---
@@ -237,7 +303,18 @@ spec:
   storageClassName: rook-ceph-bucket
 ```
 
-The existing `applications/rook/storage/warp-obc.yaml` uses `generateBucketName`.
+The existing `applications/rook/storage/warp-obc.yaml` uses `generateBucketName` against `storageClassName: rook-ceph-bucket` (the dedicated-pool store).
+
+`applications/rook/storage/demo-buckets.yaml` defines three pipeline-stage OBCs against the shared-pool store:
+
+```yaml
+# ceph-bucket-raw       → generateBucketName: ceph-bkt-raw
+# ceph-bucket-inflight  → generateBucketName: ceph-bkt-inflight
+# ceph-bucket-processed → generateBucketName: ceph-bkt-processed
+# all use storageClassName: rook-ceph-communal-bucket
+```
+
+Use these as templates for workloads that should share the EC data pool.
 
 After reconcile, in `my-app` namespace:
 
@@ -290,4 +367,20 @@ CephObjectStore  ←─── StorageClass (provisioner + objectStoreName)
                                s5cmd / aws-cli (external)
 ```
 
-Two auth paths, one store. OBC path = per-bucket subuser, credentials live with the workload. CephObjectStoreUser path = named user, credentials extracted manually, used for external/admin access.
+Two RGW endpoints, two StorageClasses, two auth paths:
+
+```
+ceph-objectstore (dedicated pools)       ceph-shared-objectstore (shared pools)
+       │                                              │
+StorageClass: rook-ceph-bucket          StorageClass: rook-ceph-communal-bucket
+       │                                              │
+   warp-bucket OBC                  ceph-bucket-raw / -inflight / -processed OBCs
+       │                                              │
+   ConfigMap + Secret                           ConfigMap + Secret
+   (same ns as OBC)                             (same ns as OBC)
+
+Both stores:
+  └── CephObjectStoreUser → Secret (AccessKey/SecretKey) → s5cmd / aws-cli (external)
+```
+
+OBC path = per-bucket subuser, credentials live with the workload. `CephObjectStoreUser` path = named user, credentials extracted manually, used for external/admin CLI access.

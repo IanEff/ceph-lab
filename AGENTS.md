@@ -25,8 +25,7 @@ from git — no manual kubectl applies.
 | GitOps | ArgoCD | stable |
 | TLS | cert-manager | v1.14.5 |
 | Ingress | Gateway API (Cilium) | v1.4.1 |
-| Observability | kube-prometheus-stack + Loki + Tempo + Alloy | |
-| Secrets | Sealed Secrets | |
+| Observability | kube-prometheus-stack | Prometheus + Grafana |
 
 ---
 
@@ -120,8 +119,8 @@ DNS: `*.ceph.lab → 192.168.56.200` via macOS dnsmasq.
 |---|---|---|---|
 | -15 | gateway-api CRDs | true | true |
 | -10 | cilium | true | true |
-| -5 | cert-manager, kube-prometheus-stack, loki, tempo | true | true |
-| 0 | alloy, sealed-secrets, metrics-server | true | true |
+| -5 | cert-manager, kube-prometheus-stack | true | true |
+| 0 | metrics-server | true | true |
 | 1 | l7-policies (CiliumNetworkPolicies) | true | true |
 | 10 | argocd-ingress | true | true |
 | 20 | rook-operator | **false** | true |

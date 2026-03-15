@@ -23,8 +23,7 @@ A fully-gitopsed Rook/Ceph playground on k3s - a sandbox to play around with cep
 | Storage | Rook v1.19.1 + Ceph Tentacle v20.2.0 | RBD, CephFS, RGW (S3) |
 | GitOps | ArgoCD stable | Kustomize-Helm, sync waves, insecure (TLS at gateway) |
 | TLS | cert-manager v1.14.5 | Self-signed CA `ceph-lab-ca`, wildcard `*.ceph.lab` |
-| Observability | kube-prometheus-stack + Loki + Tempo + Alloy | Full LGTM stack |
-| Secrets | Sealed Secrets 2.16.0 | One-way encryption, GitOps-safe |
+| Observability | kube-prometheus-stack | Prometheus + Grafana |
 
 ---
 
@@ -122,13 +121,13 @@ Everything is deployed in dependency order — no manual sequencing needed:
 |---|---|---|
 | -15 | gateway-api CRDs | Must exist before Cilium starts |
 | -10 | cilium | Gateway CRDs must precede; creates GatewayClass |
-| -5 | cert-manager, prometheus, loki, tempo | Observability backbone |
-| 0 | alloy, sealed-secrets, metrics-server | |
+| -5 | cert-manager, kube-prometheus-stack | Observability backbone |
+| 0 | metrics-server | |
 | 1 | l7-policies | CiliumNetworkPolicies (Cilium must exist) |
 | 10 | argocd-ingress | HTTPRoutes for ArgoCD UI |
 | 20 | rook operator | Helm chart, CRDs |
 | 25 | rook cluster | CephCluster CR — waits for operator |
-| 30 | rook storage | BlockPool, CephFS, ObjectStore (prune=true) |
+| 30 | rook storage | BlockPool, CephFS, ObjectStores, toolbox (prune=true) |
 | 35 | rook gateway | HTTPRoutes for Ceph Dashboard |
 
 ---
@@ -213,7 +212,7 @@ See also:
 
 - [docs/ceph-cheatsheet.md](docs/ceph-cheatsheet.md) — quick Ceph command reference
 - [docs/gitops-argocd-lessons.md](docs/gitops-argocd-lessons.md) — hard-won GitOps/ArgoCD lessons and the OutOfSync debugging playbook
-- [docs/observability-tour.md](docs/observability-tour.md) — guided walkthrough of the LGTM + Hubble observability stack
+- [docs/observability-tour.md](docs/observability-tour.md) — guided walkthrough of the Prometheus/Grafana + Hubble observability stack
 
 ---
 

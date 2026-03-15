@@ -66,7 +66,7 @@ components:
 ### Helm via Kustomize `helmCharts:`
 ArgoCD is configured with `--enable-helm` in `kustomize.buildOptions`. Two sub-patterns:
 - **Inline Helm** (Cilium, cert-manager): `helmCharts:` stanza directly in `kustomization.yaml`
-- **Wrapper Chart** (kube-prometheus-stack, Alloy, Sealed Secrets): thin `Chart.yaml` + `values.yaml`; a single `dependencies:` entry points to the upstream chart
+- **Wrapper Chart** (kube-prometheus-stack): thin `Chart.yaml` + `values.yaml`; a single `dependencies:` entry points to the upstream chart
 
 ### `GITOPS_REPO_URL` placeholder
 All `Application`/`ApplicationSet` YAMLs contain the literal string `GITOPS_REPO_URL`. `install_argocd.sh` performs a `sed` in-place substitution inside the VM before applying. **Never commit substituted URLs; keep the literal placeholder in source files.**
@@ -79,8 +79,8 @@ All `Application`/`ApplicationSet` YAMLs contain the literal string `GITOPS_REPO
 |---|---|---|---|
 | -15 | gateway-api CRDs | true | true |
 | -10 | cilium | true | true |
-| -5 | cert-manager, kube-prometheus-stack, loki, tempo | true | true |
-| 0 | alloy, sealed-secrets, metrics-server | true | true |
+| -5 | cert-manager, kube-prometheus-stack | true | true |
+| 0 | metrics-server | true | true |
 | 1 | l7-policies (CiliumNetworkPolicies) | true | true |
 | 10 | argocd-ingress | true | true |
 | 20 | rook-operator | **false** | true |

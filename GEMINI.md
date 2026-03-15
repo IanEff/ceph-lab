@@ -23,8 +23,7 @@ from git — no manual kubectl applies.
 | GitOps | ArgoCD | stable |
 | TLS | cert-manager | v1.14.5 |
 | Ingress | Gateway API (Cilium) | v1.4.1 |
-| Observability | kube-prometheus-stack + Loki + Tempo + Alloy | |
-| Secrets | Sealed Secrets | |
+| Observability | kube-prometheus-stack | |
 
 ---
 
