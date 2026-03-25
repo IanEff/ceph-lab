@@ -1,0 +1,32 @@
+# ServiceAccount + RBAC for the wave-25 PostSync health gate Job.
+# Not annotated as a hook — these are regular sync resources that persist,
+# ensuring the SA exists before the Job hook tries to use it.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ceph-health-checker
+  namespace: rook-ceph
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ceph-health-checker
+  namespace: rook-ceph
+rules:
+  - apiGroups: ["ceph.rook.io"]
+    resources: ["cephclusters"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ceph-health-checker
+  namespace: rook-ceph
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ceph-health-checker
+subjects:
+  - kind: ServiceAccount
+    name: ceph-health-checker
+    namespace: rook-ceph

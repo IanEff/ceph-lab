@@ -1,0 +1,57 @@
+# PostSync gate for wave 25 (rook-cluster).
+#
+# ArgoCD will not advance to wave 30 (rook-storage) until this Job succeeds.
+# The Job polls the CephCluster CR — no toolbox required, no exec needed —
+# and exits 0 only when the cluster has reached state=Connected AND HEALTH_OK.
+#
+# hook-delete-policy: BeforeHookCreation — old Job is removed at the start of
+# each sync, keeping the namespace tidy while still preserving logs between syncs.
+#
+# activeDeadlineSeconds: 1800 — if Ceph hasn't come up in 30 min, fail the
+# sync rather than polling forever.  Fresh bootstrap typically takes 5–10 min.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postsync-ceph-ready
+  namespace: rook-ceph
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  activeDeadlineSeconds: 1800
+  backoffLimit: 0
+  template:
+    spec:
+      serviceAccountName: ceph-health-checker
+      restartPolicy: Never
+      containers:
+        - name: wait
+          # Pin to the same minor version as the k3s cluster (1.32).
+          image: bitnami/kubectl:1.32
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+
+              echo "==> PostSync gate: waiting for CephCluster state=Connected"
+              until kubectl get cephcluster rook-ceph -n rook-ceph \
+                  -o jsonpath='{.status.state}' 2>/dev/null \
+                  | grep -q '^Connected$'; do
+                printf "    state=%s\n" \
+                  "$(kubectl get cephcluster rook-ceph -n rook-ceph \
+                      -o jsonpath='{.status.state}' 2>/dev/null || echo '<not set yet>')"
+                sleep 15
+              done
+
+              echo "==> State: Connected. Waiting for HEALTH_OK..."
+              until kubectl get cephcluster rook-ceph -n rook-ceph \
+                  -o jsonpath='{.status.ceph.health}' 2>/dev/null \
+                  | grep -q '^HEALTH_OK$'; do
+                printf "    health=%s\n" \
+                  "$(kubectl get cephcluster rook-ceph -n rook-ceph \
+                      -o jsonpath='{.status.ceph.health}' 2>/dev/null || echo '<not set yet>')"
+                sleep 15
+              done
+
+              echo "==> Ceph health: HEALTH_OK. PostSync complete — wave 30 (rook-storage) may proceed."
