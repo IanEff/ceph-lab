@@ -4,67 +4,6 @@
 # Sets up kernel modules, sysctl, swap, OSD disks, base packages, and shell ergonomics.
 set -e
 
-SANDBOX_CACHE_ENABLED="${SANDBOX_CACHE_ENABLED:-0}"
-SANDBOX_CACHE_HOST="${SANDBOX_CACHE_HOST:-}"
-SANDBOX_CACHE_APT_PORT="${SANDBOX_CACHE_APT_PORT:-3142}"
-SANDBOX_CACHE_REGISTRY_DOCKERHUB_PORT="${SANDBOX_CACHE_REGISTRY_DOCKERHUB_PORT:-5001}"
-SANDBOX_CACHE_REGISTRY_K8S_PORT="${SANDBOX_CACHE_REGISTRY_K8S_PORT:-5002}"
-SANDBOX_CACHE_REGISTRY_GHCR_PORT="${SANDBOX_CACHE_REGISTRY_GHCR_PORT:-5003}"
-SANDBOX_CACHE_REGISTRY_QUAY_PORT="${SANDBOX_CACHE_REGISTRY_QUAY_PORT:-5004}"
-
-cache_tcp_check() {
-    local host="$1" port="$2"
-    [ -z "$host" ] && return 1
-    timeout 1 bash -c "</dev/tcp/${host}/${port}" >/dev/null 2>&1
-}
-
-maybe_configure_apt_cache() {
-    [ "$SANDBOX_CACHE_ENABLED" != "1" ] && return 0
-    local h; h=$(echo "$SANDBOX_CACHE_HOST" | tr -d ' \\')
-    [ -z "$h" ] && { echo "[CACHE] SANDBOX_CACHE_HOST empty; skipping APT cache."; return 0; }
-    if ! cache_tcp_check "$h" "$SANDBOX_CACHE_APT_PORT"; then
-        echo "[CACHE] APT cache not reachable at ${h}:${SANDBOX_CACHE_APT_PORT}; continuing without it."
-        return 0
-    fi
-    echo "[CACHE] Using APT proxy at ${h}:${SANDBOX_CACHE_APT_PORT}"
-    printf 'Acquire::http::Proxy "http://%s:%s";\n' "$h" "$SANDBOX_CACHE_APT_PORT" \
-        > /etc/apt/apt.conf.d/01sandbox-cache
-    printf 'Acquire::http::Proxy::%s "DIRECT";\n' "$h" \
-        >> /etc/apt/apt.conf.d/01sandbox-cache
-    printf 'Acquire::https::Proxy "DIRECT";\n' \
-        >> /etc/apt/apt.conf.d/01sandbox-cache
-}
-
-maybe_configure_k3s_registry_mirrors() {
-    [ "$SANDBOX_CACHE_ENABLED" != "1" ] && return 0
-    local h; h=$(echo "$SANDBOX_CACHE_HOST" | tr -d ' \\')
-    [ -z "$h" ] && return 0
-    if ! cache_tcp_check "$h" "$SANDBOX_CACHE_REGISTRY_K8S_PORT"; then
-        echo "[CACHE] Registry cache not reachable; continuing without it."
-        return 0
-    fi
-    echo "[CACHE] Configuring k3s registry mirrors via ${h}"
-    mkdir -p /etc/rancher/k3s
-    cat > /etc/rancher/k3s/registries.yaml <<EOF
-mirrors:
-  docker.io:
-    endpoint:
-      - "http://${h}:${SANDBOX_CACHE_REGISTRY_DOCKERHUB_PORT}"
-  registry-1.docker.io:
-    endpoint:
-      - "http://${h}:${SANDBOX_CACHE_REGISTRY_DOCKERHUB_PORT}"
-  registry.k8s.io:
-    endpoint:
-      - "http://${h}:${SANDBOX_CACHE_REGISTRY_K8S_PORT}"
-  ghcr.io:
-    endpoint:
-      - "http://${h}:${SANDBOX_CACHE_REGISTRY_GHCR_PORT}"
-  quay.io:
-    endpoint:
-      - "http://${h}:${SANDBOX_CACHE_REGISTRY_QUAY_PORT}"
-EOF
-}
-
 echo "══════════════════════════════════════════"
 echo "  ceph-lab provisioning — common baseline  "
 echo "══════════════════════════════════════════"
@@ -81,8 +20,6 @@ DNS=8.8.8.8
 FallbackDNS=1.1.1.1
 EOF
 systemctl restart systemd-resolved
-
-maybe_configure_apt_cache
 
 echo "[3] Kernel modules for Kubernetes + Rook Ceph"
 cat > /etc/modules-load.d/k8s.conf <<EOF
@@ -147,10 +84,7 @@ apt-get install -y \
     ripgrep bat fd-find tmux fish
 systemctl enable --now iscsid
 
-echo "[9] k3s OCI registry mirrors"
-maybe_configure_k3s_registry_mirrors
-
-echo "[10] Shell ergonomics — fish, bash, vim, tmux"
+echo "[9] Shell ergonomics — fish, bash, vim, tmux"
 
 # ── fish config ────────────────────────────────────────────────────────────────
 mkdir -p /home/vagrant/.config/fish/conf.d
@@ -250,7 +184,7 @@ TMUX
 
 chown vagrant:vagrant /home/vagrant/.vimrc /home/vagrant/.tmux.conf /home/vagrant/.bashrc
 
-echo "[11] VirtualBox Guest Additions + /vagrant shared folder"
+echo "[10] VirtualBox Guest Additions + /vagrant shared folder"
 # Check for vboxsf (shared folder FS module), NOT vboxguest (kernel driver).
 # cloud-image/ubuntu-24.04 ships with vboxguest pre-loaded, but vboxsf
 # requires Guest Additions to be built from the ISO.

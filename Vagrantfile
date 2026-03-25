@@ -29,14 +29,6 @@ CONFIG = {
   control_plane_ip: ENV.fetch("SANDBOX_CONTROL_PLANE_IP", "192.168.56.50"),
   ceph_node_ip_base:Integer(ENV.fetch("SANDBOX_CEPH_NODE_IP_BASE", "60")),
 
-  cache_enabled:    ENV.fetch("SANDBOX_CACHE_ENABLED", "1") == "1",
-  cache_host:       ENV.fetch("SANDBOX_CACHE_HOST_VM",  "192.168.56.1"),
-  cache_apt_port:   ENV.fetch("SANDBOX_CACHE_APT_PORT", "3142"),
-  cache_docker_port:ENV.fetch("SANDBOX_CACHE_REGISTRY_DOCKERHUB_PORT", "5001"),
-  cache_k8s_port:   ENV.fetch("SANDBOX_CACHE_REGISTRY_K8S_PORT",       "5002"),
-  cache_ghcr_port:  ENV.fetch("SANDBOX_CACHE_REGISTRY_GHCR_PORT",      "5003"),
-  cache_quay_port:  ENV.fetch("SANDBOX_CACHE_REGISTRY_QUAY_PORT",      "5004"),
-
   configure_dnsmasq:ENV.fetch("SANDBOX_CONFIGURE_DNSMASQ", "1") == "1",
   install_argocd:   ENV.fetch("SANDBOX_INSTALL_ARGOCD",    "0") == "1",
 
@@ -53,13 +45,6 @@ Vagrant.configure("2") do |config|
 
   # ── Environment forwarded to every provisioner ──────────────────────────────
   base_env = {
-    "SANDBOX_CACHE_ENABLED"                     => (CONFIG[:cache_enabled] ? "1" : "0"),
-    "SANDBOX_CACHE_HOST"                        => CONFIG[:cache_host],
-    "SANDBOX_CACHE_APT_PORT"                    => CONFIG[:cache_apt_port],
-    "SANDBOX_CACHE_REGISTRY_DOCKERHUB_PORT"     => CONFIG[:cache_docker_port],
-    "SANDBOX_CACHE_REGISTRY_K8S_PORT"           => CONFIG[:cache_k8s_port],
-    "SANDBOX_CACHE_REGISTRY_GHCR_PORT"          => CONFIG[:cache_ghcr_port],
-    "SANDBOX_CACHE_REGISTRY_QUAY_PORT"          => CONFIG[:cache_quay_port],
     "SANDBOX_KUBERNETES_VERSION_MINOR"          => CONFIG[:k8s_minor],
     "SANDBOX_K3S_CHANNEL"                       => CONFIG[:k3s_channel],
     "ROOK_VERSION"                              => ENV.fetch("ROOK_VERSION",        "v1.19.1"),

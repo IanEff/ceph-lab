@@ -59,7 +59,6 @@ A fully-gitopsed Rook/Ceph playground on k3s - a sandbox to play around with cep
 - VirtualBox 7.x
 - Vagrant 2.3+
 - `brew install helm kubectl direnv jq` on your Mac
-- Optional but recommended: local pull-through cache (see `.env.example`)
 
 ---
 
@@ -190,7 +189,6 @@ All tuneable via `.env` (see `.env.example` for descriptions):
 | `SANDBOX_NUM_CEPH_NODES` | 3 | Worker count (min 3 for HA) |
 | `SANDBOX_OSD_DISKS_PER_NODE` | 2 | Raw OSD disks per worker |
 | `SANDBOX_INSTALL_ARGOCD` | 0 | Auto-run bootstrap after `vagrant up` |
-| `SANDBOX_CACHE_ENABLED` | 0 | APT + OCI pull-through cache at 192.168.56.1 |
 | `SANDBOX_CONFIGURE_DNSMASQ` | 1 | Write macOS dnsmasq entry for `*.ceph.lab` |
 | `ROOK_VERSION` | v1.19.1 | Rook Helm chart version |
 | `CILIUM_VERSION` | 1.18.2 | Cilium Helm chart version |
