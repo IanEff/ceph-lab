@@ -80,7 +80,7 @@ direnv allow
 vagrant up
 
 # 4. Merge kubeconfig + SSH config onto your Mac
-python3 provisioning/scripts/manage_k8s_config.py add
+uv run provisioning/scripts/manage_k8s_config.py add
 
 # 5. (Optional — if SANDBOX_INSTALL_ARGOCD=0) — bootstrap ArgoCD manually
 vagrant ssh ceph-control
@@ -107,6 +107,8 @@ kubectl exec -it -n rook-ceph deploy/rook-ceph-tools -- ceph status
 | Hubble UI | <https://hubble.ceph.lab> | — |
 | Prometheus | <https://prometheus.ceph.lab> | — |
 | Alertmanager | <https://alertmanager.ceph.lab> | — |
+| S3 (objectstore) | <https://s3.ceph.lab> | — |
+| S3 (shared objectstore) | <https://s3-shared.ceph.lab> | — |
 
 Run `bash provisioning/scripts/open_urls.sh` for a live summary including credentials.
 
@@ -127,7 +129,8 @@ Everything is deployed in dependency order — no manual sequencing needed:
 | 20 | rook operator | Helm chart, CRDs |
 | 25 | rook cluster | CephCluster CR — waits for operator |
 | 30 | rook storage | BlockPool, CephFS, ObjectStores, toolbox (prune=true) |
-| 35 | rook gateway | HTTPRoutes for Ceph Dashboard |
+| 31 | rook dashboards | Grafana ConfigMaps for Ceph Cluster/OSD/Pool views |
+| 35 | rook gateway | HTTPRoutes for Ceph Dashboard, Hubble, S3 endpoints |
 
 ---
 
@@ -173,7 +176,7 @@ bash /vagrant/provisioning/scripts/install_argocd.sh
 ## Full teardown
 
 ```bash
-python3 provisioning/scripts/manage_k8s_config.py remove
+uv run provisioning/scripts/manage_k8s_config.py remove
 vagrant destroy -f
 ```
 
@@ -211,6 +214,8 @@ See also:
 - [docs/ceph-cheatsheet.md](docs/ceph-cheatsheet.md) — quick Ceph command reference
 - [docs/gitops-argocd-lessons.md](docs/gitops-argocd-lessons.md) — hard-won GitOps/ArgoCD lessons and the OutOfSync debugging playbook
 - [docs/observability-tour.md](docs/observability-tour.md) — guided walkthrough of the Prometheus/Grafana + Hubble observability stack
+- [docs/operational-posture.md](docs/operational-posture.md) — maintenance vs normal cluster posture
+- [docs/rgw-s3-runbook.md](docs/rgw-s3-runbook.md) — RGW / S3 objectstore operations and bucket management
 
 ---
 

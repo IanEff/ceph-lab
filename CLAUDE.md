@@ -15,7 +15,7 @@ A fully-gitopsed **Rook/Ceph playground on k3s**, managed end-to-end by ArgoCD. 
 vagrant up
 
 # Merge kubeconfig + SSH config onto Mac
-python3 provisioning/scripts/manage_k8s_config.py add
+uv run provisioning/scripts/manage_k8s_config.py add
 
 # Bootstrap ArgoCD (from inside ceph-control VM, or if SANDBOX_INSTALL_ARGOCD=0)
 bash /vagrant/provisioning/scripts/install_argocd.sh
@@ -30,7 +30,7 @@ kubectl exec -it -n rook-ceph deploy/rook-ceph-tools -- ceph status
 bash provisioning/scripts/wipe_ceph_disks.sh
 
 # Full teardown
-python3 provisioning/scripts/manage_k8s_config.py remove && vagrant destroy -f
+uv run provisioning/scripts/manage_k8s_config.py remove && vagrant destroy -f
 ```
 
 ---
@@ -47,7 +47,7 @@ cluster-bootstrap/
   argocd/             # ArgoCD install patches (insecure mode, --enable-helm, resource limits)
   bootstrap/          # root-app.yaml — the seed Application that ArgoCD self-manages
 provisioning/scripts/ # VM provisioning (Vagrant) + macOS host helpers
-docs/                 # ceph-cheatsheet.md, gitops-argocd-lessons.md, observability-tour.md
+docs/                 # ceph-cheatsheet.md, gitops-argocd-lessons.md, observability-tour.md, operational-posture.md, rgw-s3-runbook.md
 ```
 
 ---
@@ -104,6 +104,7 @@ All policies live in `applications/infrastructure/l7-policies/`. One policy per 
 | 20 | rook-operator | **false** | true |
 | 25 | rook-cluster | **false** | **false** |
 | 30 | rook-storage | true | true |
+| 31 | rook-dashboards (Grafana ConfigMaps) | true | true |
 | 35 | rook-gateway | true | true |
 
 Rook operator and rook-cluster prune/selfHeal settings are intentional — they protect Ceph data from accidental ArgoCD deletes.
@@ -147,6 +148,8 @@ DNS: `*.ceph.lab → 192.168.56.200` via macOS dnsmasq.
 | Hubble UI | https://hubble.ceph.lab |
 | Prometheus | https://prometheus.ceph.lab |
 | Alertmanager | https://alertmanager.ceph.lab |
+| S3 (objectstore) | https://s3.ceph.lab |
+| S3 (shared objectstore) | https://s3-shared.ceph.lab |
 
 ---
 
@@ -156,4 +159,5 @@ DNS: `*.ceph.lab → 192.168.56.200` via macOS dnsmasq.
 - `docs/ceph-cheatsheet.md` — quick Ceph CLI reference
 - `docs/observability-tour.md` — guided walkthrough of the Prometheus/Grafana + Hubble stack
 - `docs/operational-posture.md` — maintenance vs normal cluster posture
+- `docs/rgw-s3-runbook.md` — RGW / S3 objectstore operations and bucket management
 - `.github/copilot-instructions.md` — full coding conventions (same content as this file, kept in sync)

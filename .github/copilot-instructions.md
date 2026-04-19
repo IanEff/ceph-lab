@@ -23,7 +23,7 @@ DNS: `*.ceph.lab → 192.168.56.200` via macOS dnsmasq.
 vagrant up
 
 # Merge kubeconfig + SSH config onto Mac
-python3 provisioning/scripts/manage_k8s_config.py add
+uv run provisioning/scripts/manage_k8s_config.py add
 
 # Bootstrap ArgoCD (if SANDBOX_INSTALL_ARGOCD=0)
 vagrant ssh ceph-control
@@ -39,7 +39,7 @@ kubectl exec -it -n rook-ceph deploy/rook-ceph-tools -- ceph status
 bash provisioning/scripts/wipe_ceph_disks.sh
 
 # Full teardown
-python3 provisioning/scripts/manage_k8s_config.py remove && vagrant destroy -f
+uv run provisioning/scripts/manage_k8s_config.py remove && vagrant destroy -f
 ```
 
 ---
@@ -86,6 +86,7 @@ All `Application`/`ApplicationSet` YAMLs contain the literal string `GITOPS_REPO
 | 20 | rook-operator | **false** | true |
 | 25 | rook-cluster | **false** | **false** |
 | 30 | rook-storage | true | true |
+| 31 | rook-dashboards (Grafana ConfigMaps) | true | true |
 | 35 | rook-gateway | true | true |
 
 Rook operator (`prune: false`) and rook-cluster (`prune: false`, `selfHeal: false`) are intentionally protected.  
@@ -129,7 +130,7 @@ cluster-bootstrap/
   argocd/           # ArgoCD install patches (insecure, --enable-helm, limits)
   bootstrap/        # root-app.yaml — the seed Application applied by install_argocd.sh
 provisioning/scripts/ # VM provisioning + host-side helpers
-docs/               # ceph-cheatsheet.md, gitops-argocd-lessons.md, observability-tour.md
+docs/               # ceph-cheatsheet.md, gitops-argocd-lessons.md, observability-tour.md, operational-posture.md, rgw-s3-runbook.md
 ```
 
 ---

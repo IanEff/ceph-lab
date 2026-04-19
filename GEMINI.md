@@ -18,12 +18,12 @@ from git — no manual kubectl applies.
 |---|---|---|
 | VMs | Vagrant + VirtualBox | Ubuntu 24.04, 4 nodes |
 | Kubernetes | k3s | 1.32 |
-| CNI + LB | Cilium | 1.18.2 |
+| CNI, LB & L7 Policies | Cilium | 1.18.2 |
 | Storage | Rook + Ceph Tentacle | v1.19.1 / v20.2.x |
 | GitOps | ArgoCD | stable |
 | TLS | cert-manager | v1.14.5 |
 | Ingress | Gateway API (Cilium) | v1.4.1 |
-| Observability | kube-prometheus-stack | |
+| Observability | kube-prometheus-stack, metrics-server | |
 
 ---
 
@@ -49,6 +49,9 @@ The `infra-set.yaml` ApplicationSet auto-discovers it. No other file needs editi
 ### 4. Helm is always via Kustomize
 ArgoCD uses `--enable-helm` in `kustomize.buildOptions`. Use `helmCharts:` in `kustomization.yaml` or a wrapper chart.
 
+### 5. Custom Agent Skills
+This project contains custom Gemini CLI skills in `.github/skills/`. For GitOps operations (like creating infra components or syncing waves), run the `activate_skill` tool with `ceph-gitops` to load the project's specialized workflows and component templates.
+
 ---
 
 ## Critical gotchas
@@ -58,22 +61,24 @@ ArgoCD uses `--enable-helm` in `kustomize.buildOptions`. Use `helmCharts:` in `k
 3. **Gateway API manifests must include API-defaulted fields** — See `docs/gitops-argocd-lessons.md` §3. Omitting them causes permanent ArgoCD OutOfSync loops.
 4. **`CephFilesystemSubVolumeGroup` is required** (Rook ≥ v1.17) — without it, CephFS dynamic provisioning silently fails.
 5. **ArgoCD runs insecure** — TLS terminates at Cilium Gateway using cert-manager self-signed `*.ceph.lab` wildcard.
+6. **L7 Policies (CNP) are in effect** — Cilium Network Policies in `applications/infrastructure/l7-policies/` enforce strict network isolation. If a new component needs to communicate externally or across namespaces, ensure appropriate policies exist.
 
 ---
 
 ## Directory map
 
 ```
+.github/skills/     # Custom Gemini CLI skills (e.g., ceph-gitops)
 applications/
   config/           # gitops.env (single source of truth) + Kustomize Component
-  infrastructure/   # One dir per infra component (config.json + kustomization.yaml + manifests)
+  infrastructure/   # One dir per infra component (Cilium, L7-policies, cert-manager, metrics-server, etc.)
   clusters/ceph-lab/ # ApplicationSet (infra-set.yaml) + per-wave Rook Applications
-  rook/             # Kustomize bases for rook-operator, rook-cluster, rook-storage, rook-gateway
+  rook/             # Kustomize bases for rook-operator, cluster, storage, gateway, and dashboards
 cluster-bootstrap/
   argocd/           # ArgoCD install patches (insecure, --enable-helm, limits)
   bootstrap/        # root-app.yaml — the seed Application applied by install_argocd.sh
-provisioning/scripts/ # VM provisioning + host-side helpers
-docs/               # ceph-cheatsheet.md, gitops-argocd-lessons.md, observability-tour.md
+provisioning/scripts/ # VM provisioning + host-side helpers (dnsmasq, trust_ca, UI access scripts)
+docs/               # runbooks, operational posture, observability tour, gitops lessons
 ```
 
 ---
@@ -87,4 +92,5 @@ bash provisioning/scripts/install_argocd.sh                       # bootstrap Ar
 kubectl get applications -n argocd -w --context ceph-lab          # watch sync
 kubectl exec -it -n rook-ceph deploy/rook-ceph-tools -- ceph status
 bash provisioning/scripts/wipe_ceph_disks.sh                      # wipe OSDs
+bash provisioning/scripts/open_urls.sh                            # quickly open all UIs
 ```
