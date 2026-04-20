@@ -76,30 +76,8 @@ serverFiles:
       - /etc/config/recording_rules.yml
       - /etc/config/alerting_rules.yml
     scrape_configs:
-      # ServiceMonitor-style discovery: scrape all services with the
-      # prometheus.io/scrape annotation as well as rook-ceph metrics.
-      - job_name: "kubernetes-service-endpoints"
-        kubernetes_sd_configs:
-          - role: endpoints
-        relabel_configs:
-          - source_labels: [ __meta_kubernetes_service_annotation_prometheus_io_scrape ]
-            action: keep
-            regex: "true"
-          - source_labels: [ __meta_kubernetes_service_annotation_prometheus_io_path ]
-            action: replace
-            target_label: __metrics_path__
-            regex: (.+)
-          - source_labels: [ __address__, __meta_kubernetes_service_annotation_prometheus_io_port ]
-            action: replace
-            regex: ([^:]+)(?::\d+)?;(\d+)
-            replacement: $1:$2
-            target_label: __address__
-          - action: labelmap
-            regex: __meta_kubernetes_service_label_(.+)
-          - source_labels: [ __meta_kubernetes_namespace ]
-            target_label: namespace
-          - source_labels: [ __meta_kubernetes_service_name ]
-            target_label: service
+      # The chart's default scrape_configs already cover kubernetes-service-endpoints,
+      # kubernetes-nodes, kubernetes-pods, etc. Only add custom targets below.
 
       # Rook-ceph MGR metrics (port 9283) — scraped directly regardless of annotation.
       - job_name: "rook-ceph-mgr"
