@@ -33,8 +33,8 @@ subjects:
     name: rook-ceph-system
     namespace: rook-ceph
 ---
-# Allow the Prometheus instance in the monitoring namespace to GET pods, services,
-# and endpoints in rook-ceph so it can scrape metrics.
+# Allow Alloy (the metrics scraper in the monitoring namespace) to GET pods,
+# services, and endpoints in rook-ceph so it can scrape metrics.
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -63,8 +63,8 @@ roleRef:
   name: rook-ceph-metrics
 subjects:
   - kind: ServiceAccount
-    # kube-prometheus-stack creates its Prometheus SA as kube-prometheus-stack-prometheus
-    name: kube-prometheus-stack-prometheus
+    # Alloy (grafana/alloy chart, release name "alloy") is the metrics scraper.
+    name: alloy
     namespace: monitoring
 ---
 # Allow the rook-ceph-mgr SA to manage ServiceMonitors (so the MGR can self-configure

@@ -3,5 +3,7 @@ kind: Kustomization
 namespace: rook-ceph
 resources:
   - cephcluster.yaml
+  - monitoring-rbac.yaml
+  - prometheus-rules.yaml
   - postsync-ceph-health-rbac.yaml
   - postsync-ceph-health.yaml
