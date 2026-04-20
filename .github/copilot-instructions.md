@@ -25,8 +25,7 @@ vagrant up
 # Merge kubeconfig + SSH config onto Mac
 uv run provisioning/scripts/manage_k8s_config.py add
 
-# Bootstrap ArgoCD (if SANDBOX_INSTALL_ARGOCD=0)
-vagrant ssh ceph-control
+# Bootstrap ArgoCD (run from inside ceph-control VM)
 bash /vagrant/provisioning/scripts/install_argocd.sh
 
 # Watch all ArgoCD apps
@@ -68,8 +67,12 @@ ArgoCD is configured with `--enable-helm` in `kustomize.buildOptions`. Two sub-p
 - **Inline Helm** (Cilium, cert-manager): `helmCharts:` stanza directly in `kustomization.yaml`
 - **Wrapper Chart** (kube-prometheus-stack): thin `Chart.yaml` + `values.yaml`; a single `dependencies:` entry points to the upstream chart
 
-### `GITOPS_REPO_URL` placeholder
-All `Application`/`ApplicationSet` YAMLs contain the literal string `GITOPS_REPO_URL`. `install_argocd.sh` performs a `sed` in-place substitution inside the VM before applying. **Never commit substituted URLs; keep the literal placeholder in source files.**
+### `GITOPS_REPO_URL` bootstrap variable
+`GITOPS_REPO_URL` is an **environment variable** consumed by `install_argocd.sh` — it is used to:
+1. Create the ArgoCD repository secret (with SSH deploy key or HTTPS token)
+2. `sed`-substitute the literal string `GITOPS_REPO_URL` across all YAMLs under `applications/clusters/` and `cluster-bootstrap/` at bootstrap time
+
+After bootstrapping, the actual repo URL is in-place in those files. Set `GITOPS_REPO_URL` in `.env` before running `install_argocd.sh` on a fresh clone.
 
 ---
 
@@ -84,13 +87,16 @@ All `Application`/`ApplicationSet` YAMLs contain the literal string `GITOPS_REPO
 | 1 | l7-policies (CiliumNetworkPolicies) | true | true |
 | 10 | argocd-ingress | true | true |
 | 20 | rook-operator | **false** | true |
-| 25 | rook-cluster | **false** | **false** |
+| 25 | rook-cluster + PostSync gate | **false** | **false** |
 | 30 | rook-storage | true | true |
 | 31 | rook-dashboards (Grafana ConfigMaps) | true | true |
-| 35 | rook-gateway | true | true |
+| 35 | rook-gateway (dashboard, S3, S3-shared routes) | true | true |
 
 Rook operator (`prune: false`) and rook-cluster (`prune: false`, `selfHeal: false`) are intentionally protected.  
 `rook-cluster` has `ignoreDifferences` on `/status` and `/spec/mon/count` because the operator mutates those fields.
+
+### PostSync gate (wave 25 → 30)
+`applications/rook/cluster/postsync-ceph-health.yaml` is an ArgoCD `PostSync` hook Job that polls the `CephCluster` CR until `state=Connected` and `health=HEALTH_OK`. ArgoCD will not advance to wave 30 (rook-storage) until it exits 0. Timeout: 30 minutes (`activeDeadlineSeconds: 1800`). The companion RBAC in `postsync-ceph-health-rbac.yaml` is a regular (non-hook) sync resource that persists.
 
 ---
 
@@ -101,6 +107,12 @@ All policies live in `applications/infrastructure/l7-policies/`. Pattern:
 - `endpointSelector: {}` — applies to entire namespace
 - Ingress: `fromEntities: [cluster]` with `toPorts[].rules.http: [{}]` for L7 visibility; L4-only for raw Ceph ports
 - Egress: always includes DNS (`kube-system/kube-dns`, matchPattern `"*"`), then kube-apiserver + world for HTTPS
+
+---
+
+## Maintenance overlay
+
+`applications/rook/cluster/overlays/maintenance/` is a Kustomize overlay over the base `rook/cluster/` that adds aggressive OSD recovery throttles via a strategic-merge patch on `CephCluster`. To enter maintenance posture, point the `rook-cluster` Application's `path` at this overlay and sync. Revert to the base path to restore conservative defaults.
 
 ---
 
@@ -115,6 +127,22 @@ All policies live in `applications/infrastructure/l7-policies/`. Pattern:
 7. **Hubble metrics are disabled at bootstrap** — kube-prometheus-stack CRDs don't exist yet. Enable after wave `-5` settles.
 8. **k3s uses SQLite, not etcd** — `kubeEtcd` scraper is disabled in kube-prometheus-stack values.
 9. **`--enable-helm` is required** — patched into `argocd-cm` via `cluster-bootstrap/argocd/kustomization.yaml`. Without it, `helmCharts:` stanzas do nothing.
+10. **Gateway API manifests must include API-defaulted fields** — The admission webhook injects `group: ""`, `kind: Service`, `weight: 1` into `backendRefs` and `matches` into HTTPRoute rules. Omitting them causes permanent ArgoCD OutOfSync loops. See `docs/gitops-argocd-lessons.md`.
+
+---
+
+## Service URLs
+
+| Service | URL |
+|---|---|
+| ArgoCD | https://argocd.ceph.lab |
+| Grafana | https://grafana.ceph.lab |
+| Ceph Dashboard | https://dashboard.ceph.lab |
+| Hubble UI | https://hubble.ceph.lab |
+| Prometheus | https://prometheus.ceph.lab |
+| Alertmanager | https://alertmanager.ceph.lab |
+| S3 (objectstore) | https://s3.ceph.lab |
+| S3 (shared objectstore) | https://s3-shared.ceph.lab |
 
 ---
 
@@ -122,15 +150,28 @@ All policies live in `applications/infrastructure/l7-policies/`. Pattern:
 
 ```
 applications/
-  config/           # gitops.env (single source of truth) + Kustomize Component
-  infrastructure/   # One dir per infra component (config.json + kustomization.yaml + manifests)
-  clusters/ceph-lab/ # ApplicationSet (infra-set.yaml) + per-wave Rook Applications
-  rook/             # Kustomize bases for rook-operator, rook-cluster, rook-storage, rook-gateway
+  config/             # gitops.env (single source of truth) + Kustomize Component
+  infrastructure/     # One dir per infra component (config.json + kustomization.yaml + manifests)
+  clusters/ceph-lab/  # ApplicationSet (infra-set.yaml) + per-wave Rook Applications
+  rook/
+    cluster/          # CephCluster CR, PostSync health gate, prometheus-rules
+      overlays/
+        maintenance/  # Kustomize overlay: aggressive OSD recovery throttles
+    dashboards/       # Grafana ConfigMaps (ceph-cluster, ceph-osd, ceph-pools)
+    gateway/          # HTTPRoutes: dashboard, S3, S3-shared
+    operator/         # Rook operator Helm chart + CRDs
+    storage/          # CephBlockPool, CephFilesystem, CephObjectStore(s), StorageClasses, toolbox
 cluster-bootstrap/
-  argocd/           # ArgoCD install patches (insecure, --enable-helm, limits)
-  bootstrap/        # root-app.yaml — the seed Application applied by install_argocd.sh
+  argocd/             # ArgoCD install patches (insecure, --enable-helm, limits)
+  bootstrap/          # root-app.yaml — the seed Application applied by install_argocd.sh
 provisioning/scripts/ # VM provisioning + host-side helpers
-docs/               # ceph-cheatsheet.md, gitops-argocd-lessons.md, observability-tour.md, operational-posture.md, rgw-s3-runbook.md
+docs/
+  ceph-cheatsheet.md
+  gitops-argocd-lessons.md   # OutOfSync debugging playbook
+  observability-tour.md
+  operational-posture.md     # Maintenance vs normal posture guide
+  rgw-s3-runbook.md          # RGW / S3 objectstore operations
+  trim-observability-stack.md
 ```
 
 ---
