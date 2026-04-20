@@ -5,7 +5,7 @@ metadata:
   namespace: monitoring
 spec:
   hostnames:
-    - "grafana.ceph.lab"   # patched from GRAFANA_HOSTNAME via Kustomize
+    - "grafana.ceph.lab" # patched from GRAFANA_HOSTNAME via Kustomize
   parentRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway

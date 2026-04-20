@@ -1,8 +1,8 @@
-adminPassword: "password"   # change in production
+adminPassword: "password" # change in production
 
 grafana.ini:
   server:
-    root_url: "https://grafana.ceph.lab/"   # patched at bootstrap by gitops.env
+    root_url: "https://grafana.ceph.lab/" # patched at bootstrap by gitops.env
   # Disable telemetry — laptop lab, no phone-home.
   analytics:
     reporting_enabled: false
@@ -43,7 +43,7 @@ datasources:
 alerting: {}
 
 persistence:
-  enabled: false   # Dashboards loaded from ConfigMaps; no state to persist.
+  enabled: false # Dashboards loaded from ConfigMaps; no state to persist.
 
 resources:
   requests:

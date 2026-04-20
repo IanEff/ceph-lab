@@ -27,7 +27,7 @@ alloy:
       }
 
 controller:
-  type: daemonset   # Run on every node for future log/trace collection.
+  type: daemonset # Run on every node for future log/trace collection.
 
 resources:
   requests:

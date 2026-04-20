@@ -7,15 +7,15 @@ metadata:
 spec:
   endpointSelector: {}
   ingress:
-    - fromEntities: [cluster]
+    - fromEntities: [ cluster ]
       toPorts:
         - ports:
-            - { port: "9090", protocol: TCP }   # Prometheus server
-            - { port: "3000", protocol: TCP }   # Grafana
-            - { port: "80",   protocol: TCP }   # Prometheus server (nginx proxy)
+            - { port: "9090", protocol: TCP } # Prometheus server
+            - { port: "3000", protocol: TCP } # Grafana
+            - { port: "80", protocol: TCP } # Prometheus server (nginx proxy)
           rules:
-            http: [{}]
-    - fromEntities: [host, remote-node]
+            http: [ {} ]
+    - fromEntities: [ host, remote-node ]
   egress:
     - toEndpoints:
         - matchLabels:
@@ -28,9 +28,9 @@ spec:
           rules:
             dns:
               - matchPattern: "*"
-    - toEntities: [cluster, kube-apiserver, world]
+    - toEntities: [ cluster, kube-apiserver, world ]
       toPorts:
         - ports:
-            - { port: "80",   protocol: TCP }
-            - { port: "443",  protocol: TCP }
+            - { port: "80", protocol: TCP }
+            - { port: "443", protocol: TCP }
             - { port: "6443", protocol: TCP }

@@ -5,7 +5,7 @@ metadata:
   namespace: monitoring
 spec:
   hostnames:
-    - "prometheus.ceph.lab"   # patched from PROMETHEUS_HOSTNAME via Kustomize
+    - "prometheus.ceph.lab" # patched from PROMETHEUS_HOSTNAME via Kustomize
   parentRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway

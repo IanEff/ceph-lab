@@ -3,7 +3,7 @@ kind: Kustomization
 namespace: monitoring
 
 components:
-  - ../../config   # injects PROMETHEUS_HOSTNAME via replacement
+  - ../../config # injects PROMETHEUS_HOSTNAME via replacement
 
 helmCharts:
   - name: prometheus

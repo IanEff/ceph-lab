@@ -12,7 +12,7 @@ server:
   persistentVolume:
     enabled: true
     size: 10Gi
-    storageClass: ""   # uses cluster default (ceph-block)
+    storageClass: "" # uses cluster default (ceph-block)
 
   resources:
     requests:
@@ -41,7 +41,7 @@ server:
         - targets: ['localhost:9090']
 
 alertmanager:
-  enabled: false   # Lab: no paging. Use Grafana unified alerting instead.
+  enabled: false # Lab: no paging. Use Grafana unified alerting instead.
 
 # node-exporter and kube-state-metrics are included in the chart.
 prometheus-node-exporter:
@@ -78,52 +78,52 @@ serverFiles:
     scrape_configs:
       # ServiceMonitor-style discovery: scrape all services with the
       # prometheus.io/scrape annotation as well as rook-ceph metrics.
-      - job_name: 'kubernetes-service-endpoints'
+      - job_name: "kubernetes-service-endpoints"
         kubernetes_sd_configs:
           - role: endpoints
         relabel_configs:
-          - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+          - source_labels: [ __meta_kubernetes_service_annotation_prometheus_io_scrape ]
             action: keep
             regex: "true"
-          - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+          - source_labels: [ __meta_kubernetes_service_annotation_prometheus_io_path ]
             action: replace
             target_label: __metrics_path__
             regex: (.+)
-          - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+          - source_labels: [ __address__, __meta_kubernetes_service_annotation_prometheus_io_port ]
             action: replace
             regex: ([^:]+)(?::\d+)?;(\d+)
             replacement: $1:$2
             target_label: __address__
           - action: labelmap
             regex: __meta_kubernetes_service_label_(.+)
-          - source_labels: [__meta_kubernetes_namespace]
+          - source_labels: [ __meta_kubernetes_namespace ]
             target_label: namespace
-          - source_labels: [__meta_kubernetes_service_name]
+          - source_labels: [ __meta_kubernetes_service_name ]
             target_label: service
 
       # Rook-ceph MGR metrics (port 9283) — scraped directly regardless of annotation.
-      - job_name: 'rook-ceph-mgr'
+      - job_name: "rook-ceph-mgr"
         static_configs:
           - targets:
-              - 'rook-ceph-mgr.rook-ceph.svc.cluster.local:9283'
+              - "rook-ceph-mgr.rook-ceph.svc.cluster.local:9283"
         relabel_configs:
           - target_label: job
             replacement: rook-ceph-mgr
 
       # Rook operator metrics (port 2112).
-      - job_name: 'rook-ceph-operator'
+      - job_name: "rook-ceph-operator"
         static_configs:
           - targets:
-              - 'rook-ceph-operator-metrics.rook-ceph.svc.cluster.local:2112'
+              - "rook-ceph-operator-metrics.rook-ceph.svc.cluster.local:2112"
         relabel_configs:
           - target_label: job
             replacement: rook-ceph-operator
 
       # Hubble metrics (Cilium flow observability).
-      - job_name: 'hubble-metrics'
+      - job_name: "hubble-metrics"
         static_configs:
           - targets:
-              - 'hubble-metrics.kube-system.svc.cluster.local:9965'
+              - "hubble-metrics.kube-system.svc.cluster.local:9965"
         relabel_configs:
           - target_label: job
             replacement: hubble

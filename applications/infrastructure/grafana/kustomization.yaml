@@ -3,7 +3,7 @@ kind: Kustomization
 namespace: monitoring
 
 components:
-  - ../../config   # injects GRAFANA_HOSTNAME via replacement below
+  - ../../config # injects GRAFANA_HOSTNAME via replacement below
 
 helmCharts:
   - name: grafana
