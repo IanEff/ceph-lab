@@ -29,10 +29,9 @@ spec:
   dashboard:
     enabled: true
     ssl: false # TLS terminated at the Cilium Gateway
-    # Wire the dashboard to Mimir's Prometheus-compatible query API so it can
-    # show cluster metrics. The mimir-distributed chart's nginx gateway exposes
-    # this at :80/prometheus.
-    prometheusEndpoint: http://mimir-nginx.monitoring.svc.cluster.local/prometheus
+    # Wire the dashboard to the standalone Prometheus server so it can show
+    # cluster metrics. Using the cluster-internal URL avoids TLS issues.
+    prometheusEndpoint: http://prometheus-server.monitoring.svc.cluster.local
     prometheusEndpointSSLVerify: false
 
   # ── Observability ─────────────────────────────────────────────────────────

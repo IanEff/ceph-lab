@@ -1,1 +1,0 @@
-{ "appName": "kube-prometheus-stack", "syncWave": "-5", "namespace": "monitoring", "localPath": "applications/infrastructure/kube-prometheus-stack" }

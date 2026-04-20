@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+
+components:
+  - ../../config   # injects GRAFANA_HOSTNAME via replacement below
+
+helmCharts:
+  - name: grafana
+    repo: https://grafana.github.io/helm-charts
+    version: "10.5.15"
+    releaseName: grafana
+    namespace: monitoring
+    valuesFile: values.yaml
+
+# The HTTPRoute hostname is patched by config/kustomization.yaml replacements
+# (GRAFANA_HOSTNAME → spec.hostnames.0). The route is rendered inline here
+# rather than as a Helm template so Kustomize replacements can target it.
+resources:
+  - httproute.yaml

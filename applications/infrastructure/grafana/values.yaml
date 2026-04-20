@@ -1,0 +1,54 @@
+adminPassword: "password"   # change in production
+
+grafana.ini:
+  server:
+    root_url: "https://grafana.ceph.lab/"   # patched at bootstrap by gitops.env
+  # Disable telemetry — laptop lab, no phone-home.
+  analytics:
+    reporting_enabled: false
+    check_for_updates: false
+
+service:
+  type: ClusterIP
+  port: 80
+
+# Dashboard sidecar: auto-imports any ConfigMap with grafana_dashboard=1
+# from any namespace. Picks up rook-dashboards and Cilium/Hubble dashboards.
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    searchNamespace: ALL
+  datasources:
+    enabled: true
+    label: grafana_datasource
+    labelValue: "1"
+
+# Provision Prometheus as the default datasource directly rather than via
+# a sidecar ConfigMap — simpler for a single-datasource lab.
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        uid: prometheus
+        url: http://prometheus-server.monitoring.svc.cluster.local
+        isDefault: true
+        editable: true
+
+# Unified alerting (Grafana 10+) replaces Alertmanager for lab use.
+# Rules are managed in the Grafana UI or via provisioning ConfigMaps.
+alerting: {}
+
+persistence:
+  enabled: false   # Dashboards loaded from ConfigMaps; no state to persist.
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
