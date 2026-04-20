@@ -82,8 +82,9 @@ After bootstrapping, the actual repo URL is in-place in those files. Set `GITOPS
 |---|---|---|---|
 | -15 | gateway-api CRDs | true | true |
 | -10 | cilium | true | true |
-| -5 | cert-manager, kube-prometheus-stack | true | true |
-| 0 | metrics-server | true | true |
+| -6 | prometheus-operator-crds | true | true |
+| -5 | cert-manager, prometheus, grafana | true | true |
+| 0 | alloy, metrics-server | true | true |
 | 1 | l7-policies (CiliumNetworkPolicies) | true | true |
 | 10 | argocd-ingress | true | true |
 | 20 | rook-operator | **false** | true |
@@ -124,8 +125,8 @@ All policies live in `applications/infrastructure/l7-policies/`. Pattern:
 4. **`CephFilesystemSubVolumeGroup` is required** (Rook ≥ v1.17) — without it, CephFS dynamic provisioning silently fails. See `applications/rook/storage/filesystem.yaml`.
 5. **`preserve*OnDelete: true`** on `CephFilesystem` and `CephObjectStore` — ArgoCD can delete their CRs without destroying Ceph data.
 6. **ArgoCD runs insecure** — TLS terminates at Cilium Gateway using cert-manager self-signed `*.ceph.lab` wildcard. Trust `ceph-lab-ca` on Mac to avoid browser warnings.
-7. **Hubble metrics are disabled at bootstrap** — kube-prometheus-stack CRDs don't exist yet. Enable after wave `-5` settles.
-8. **k3s uses SQLite, not etcd** — `kubeEtcd` scraper is disabled in kube-prometheus-stack values.
+7. **Hubble metrics are collected via Alloy** — Prometheus scrapes Alloy, which in turn scrapes Hubble. Ensure `l7-visibility` policies allow this path.
+8. **k3s uses SQLite, not etcd** — `kubeEtcd` scraper is disabled in prometheus values.
 9. **`--enable-helm` is required** — patched into `argocd-cm` via `cluster-bootstrap/argocd/kustomization.yaml`. Without it, `helmCharts:` stanzas do nothing.
 10. **Gateway API manifests must include API-defaulted fields** — The admission webhook injects `group: ""`, `kind: Service`, `weight: 1` into `backendRefs` and `matches` into HTTPRoute rules. Omitting them causes permanent ArgoCD OutOfSync loops. See `docs/gitops-argocd-lessons.md`.
 

@@ -21,9 +21,9 @@ from git — no manual kubectl applies.
 | CNI, LB & L7 Policies | Cilium | 1.18.2 |
 | Storage | Rook + Ceph Tentacle | v1.19.1 / v20.2.x |
 | GitOps | ArgoCD | stable |
-| TLS | cert-manager | v1.14.5 |
+| TLS | cert-manager | v1.17.2 |
 | Ingress | Gateway API (Cilium) | v1.4.1 |
-| Observability | kube-prometheus-stack, metrics-server | |
+| Observability | Prometheus, Grafana, Alloy, metrics-server | |
 
 ---
 
@@ -44,12 +44,29 @@ Create `applications/infrastructure/<name>/config.json`:
 ```json
 { "appName": "my-app", "syncWave": "0", "namespace": "my-ns", "localPath": "applications/infrastructure/my-app" }
 ```
-The `infra-set.yaml` ApplicationSet auto-discovers it. No other file needs editing.
+The `infrastructure-set` ApplicationSet auto-discovers it. No other file needs editing.
 
-### 4. Helm is always via Kustomize
+### 4. ArgoCD Sync Waves
+
+| Wave | Component | Prune | SelfHeal |
+|---|---|---|---|
+| -15 | gateway-api CRDs | true | true |
+| -10 | cilium | true | true |
+| -6 | prometheus-operator-crds | true | true |
+| -5 | cert-manager, prometheus, grafana | true | true |
+| 0 | alloy, metrics-server | true | true |
+| 1 | l7-policies (CiliumNetworkPolicies) | true | true |
+| 10 | argocd-ingress | true | true |
+| 20 | rook-operator | **false** | true |
+| 25 | rook-cluster + PostSync gate | **false** | **false** |
+| 30 | rook-storage (pools, fs, object) | true | true |
+| 31 | rook-dashboards (Grafana CMs) | true | true |
+| 35 | rook-gateway (routes) | true | true |
+
+### 5. Helm is always via Kustomize
 ArgoCD uses `--enable-helm` in `kustomize.buildOptions`. Use `helmCharts:` in `kustomization.yaml` or a wrapper chart.
 
-### 5. Custom Agent Skills
+### 6. Custom Agent Skills
 This project contains custom Gemini CLI skills in `.github/skills/`. For GitOps operations (like creating infra components or syncing waves), run the `activate_skill` tool with `ceph-gitops` to load the project's specialized workflows and component templates.
 
 ---
@@ -62,6 +79,7 @@ This project contains custom Gemini CLI skills in `.github/skills/`. For GitOps 
 4. **`CephFilesystemSubVolumeGroup` is required** (Rook ≥ v1.17) — without it, CephFS dynamic provisioning silently fails.
 5. **ArgoCD runs insecure** — TLS terminates at Cilium Gateway using cert-manager self-signed `*.ceph.lab` wildcard.
 6. **L7 Policies (CNP) are in effect** — Cilium Network Policies in `applications/infrastructure/l7-policies/` enforce strict network isolation. If a new component needs to communicate externally or across namespaces, ensure appropriate policies exist.
+7. **Hubble metrics are collected via Alloy** — Prometheus scrapes Alloy, which in turn scrapes Hubble. Ensure `l7-visibility` policies allow this path.
 
 ---
 
@@ -71,7 +89,15 @@ This project contains custom Gemini CLI skills in `.github/skills/`. For GitOps 
 .github/skills/     # Custom Gemini CLI skills (e.g., ceph-gitops)
 applications/
   config/           # gitops.env (single source of truth) + Kustomize Component
-  infrastructure/   # One dir per infra component (Cilium, L7-policies, cert-manager, metrics-server, etc.)
+  infrastructure/   # One dir per infra component:
+    alloy/          # Metric collection agent
+    prometheus/     # Time-series database
+    grafana/        # Dashboards & Visualization
+    prometheus-operator-crds/ # Foundation for monitoring CRDs
+    cilium/         # CNI & Gateway
+    l7-policies/    # Network security policies
+    cert-manager/   # TLS certificate management
+    metrics-server/ # Core K8s metrics
   clusters/ceph-lab/ # ApplicationSet (infra-set.yaml) + per-wave Rook Applications
   rook/             # Kustomize bases for rook-operator, cluster, storage, gateway, and dashboards
 cluster-bootstrap/
@@ -87,7 +113,7 @@ docs/               # runbooks, operational posture, observability tour, gitops 
 
 ```bash
 vagrant up                                                          # boot cluster
-python3 provisioning/scripts/manage_k8s_config.py add             # merge kubeconfig
+uv run provisioning/scripts/manage_k8s_config.py add             # merge kubeconfig
 bash provisioning/scripts/install_argocd.sh                       # bootstrap ArgoCD
 kubectl get applications -n argocd -w --context ceph-lab          # watch sync
 kubectl exec -it -n rook-ceph deploy/rook-ceph-tools -- ceph status
