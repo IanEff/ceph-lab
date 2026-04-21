@@ -16,19 +16,6 @@ spec:
         namespaces:
           from: All
 
-    - name: https
-      port: 443
-      protocol: HTTPS
-      tls:
-        mode: Terminate
-        certificateRefs:
-          - group: ""
-            kind: Secret
-            name: gateway-tls
-      allowedRoutes:
-        namespaces:
-          from: All
-
     # Cleartext gRPC for Hubble relay (Cilium proxies it, observes l7 flows)
     - name: hubble-relay
       port: 4245

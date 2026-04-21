@@ -12,7 +12,7 @@ spec:
       kind: Gateway
       name: cilium-gateway
       namespace: kube-system
-      sectionName: https
+      sectionName: http
   hostnames:
     - s3.ceph.lab
   rules:

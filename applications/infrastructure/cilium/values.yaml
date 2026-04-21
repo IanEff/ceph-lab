@@ -26,10 +26,7 @@ gatewayAPI:
 operator:
   replicas: 1
   dashboards:
-    enabled: true
-    label: grafana_dashboard
-    labelValue: "1"
-    namespace: monitoring
+    enabled: false
 
 hubble:
   enabled: true
@@ -41,12 +38,11 @@ hubble:
       - flow
       - icmp
       - "httpV2:exemplars=true;labelsContext=source_ip,source_namespace,source_workload,destination_ip,destination_namespace,destination_workload,traffic_direction"
-    # Grafana sidecar will auto-import the Hubble dashboards
+    # Dashboard ConfigMaps exceed the 262 KB annotation limit; disabled to
+    # unblock ArgoCD sync. Re-enable once a server-side-aware Grafana sidecar
+    # workflow is in place.
     dashboards:
-      enabled: true
-      label: grafana_dashboard
-      labelValue: "1"
-      namespace: monitoring
+      enabled: false
     serviceMonitor:
       # Disabled at bootstrap; enabled once Prometheus CRDs are established
       enabled: false
@@ -56,7 +52,4 @@ hubble:
     enabled: true
 
 dashboards:
-  enabled: true
-  label: grafana_dashboard
-  labelValue: "1"
-  namespace: monitoring
+  enabled: false

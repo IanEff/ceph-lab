@@ -22,13 +22,6 @@ server:
       cpu: 500m
       memory: 768Mi
 
-  # Enable remote_write receiver so Alloy can push additional metrics.
-  remoteWrite: []
-  extraFlags:
-    - web.enable-remote-write-receiver
-
-  # Discover ServiceMonitors and PrometheusRules across all namespaces so
-  # Rook's auto-created ServiceMonitors (rook-ceph namespace) are scraped.
   global:
     scrape_interval: 30s
     scrape_timeout: 10s

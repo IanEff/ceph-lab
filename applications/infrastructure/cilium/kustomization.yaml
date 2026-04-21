@@ -7,8 +7,6 @@ components:
 
 resources:
   - gateway.yaml
-  - gateway-tls.yaml
-  - http-redirect.yaml
   - hubble-ui-route.yaml
   - hubble-relay-route.yaml
   - lb-pool.yaml

@@ -11,7 +11,7 @@ spec:
       kind: Gateway
       name: cilium-gateway
       namespace: kube-system
-      sectionName: https
+      sectionName: http
   rules:
     - matches:
         - path:
