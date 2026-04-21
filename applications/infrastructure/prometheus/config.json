@@ -1,0 +1,6 @@
+{
+    "appName": "prometheus",
+    "syncWave": "-5",
+    "namespace": "monitoring",
+    "localPath": "applications/infrastructure/prometheus"
+}

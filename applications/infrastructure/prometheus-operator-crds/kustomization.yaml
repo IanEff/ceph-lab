@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+
+# Installs only the Prometheus Operator CRDs (ServiceMonitor, PrometheusRule,
+# PodMonitor, etc.) with no controller. This lets Rook create ServiceMonitors
+# and PrometheusRules without requiring the full kube-prometheus-stack operator.
+# Must deploy before wave -5 (prometheus) so CRDs exist when Prometheus installs.
+# Force ArgoCD to use Replace (not SSA) for these CRDs — the schemas are too
+# large for SSA's OpenAPI download to complete within the request timeout.
+commonAnnotations:
+  argocd.argoproj.io/sync-options: Replace=true
+
+helmCharts:
+  - name: prometheus-operator-crds
+    repo: https://prometheus-community.github.io/helm-charts
+    version: "28.0.1"
+    releaseName: prometheus-operator-crds
+    namespace: monitoring
