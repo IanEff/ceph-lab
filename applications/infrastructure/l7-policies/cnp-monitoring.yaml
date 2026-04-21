@@ -1,4 +1,6 @@
-# L7 visibility for the monitoring namespace (Prometheus, Grafana, Alloy).
+# L4 policy for the monitoring namespace (Prometheus, Grafana).
+# L7 HTTP rules removed — they route through Cilium Envoy which stalls
+# intra-cluster traffic when Envoy is under pressure.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -12,9 +14,7 @@ spec:
         - ports:
             - { port: "9090", protocol: TCP } # Prometheus server
             - { port: "3000", protocol: TCP } # Grafana
-            - { port: "80", protocol: TCP } # Prometheus server (nginx proxy)
-          rules:
-            http: [ {} ]
+            - { port: "80", protocol: TCP }   # Prometheus service port
     - fromEntities: [ host, remote-node ]
   egress:
     - toEndpoints:
@@ -34,3 +34,4 @@ spec:
             - { port: "80", protocol: TCP }
             - { port: "443", protocol: TCP }
             - { port: "6443", protocol: TCP }
+            - { port: "9090", protocol: TCP } # Prometheus (post-DNAT egress)
