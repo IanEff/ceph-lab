@@ -1,6 +1,5 @@
-# L7 visibility into the rook-ceph namespace.
-# Every flow through here will appear in Hubble with HTTP fields populated
-# on ports 80 (RGW), 7000 (dashboard), 9283/9926 (metrics).
+# L4 policy for the rook-ceph namespace.
+# L7 HTTP rules removed — Envoy proxy overhead caused scrape timeouts.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -9,7 +8,7 @@ metadata:
 spec:
   endpointSelector: {}
   ingress:
-    # HTTP: RGW S3, MGR dashboard, Prometheus metrics, Rook operator metrics
+    # RGW S3, MGR dashboard, Prometheus metrics, Rook operator metrics
     - fromEntities: [cluster]
       toPorts:
         - ports:
@@ -19,8 +18,6 @@ spec:
             - { port: "8080", protocol: TCP }
             - { port: "2112", protocol: TCP }
             - { port: "9926", protocol: TCP }
-          rules:
-            http: [{}]
     # Rook operator webhook (TLS, L4 only)
     - fromEntities: [kube-apiserver]
       toPorts:
