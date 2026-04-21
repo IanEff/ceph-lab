@@ -34,7 +34,7 @@ datasources:
       - name: Prometheus
         type: prometheus
         uid: prometheus
-        url: http://rook-ceph-mgr.rook-ceph.svc.cluster.local:9283
+        url: http://prometheus-server.monitoring.svc.cluster.local
         isDefault: true
         editable: true
 
