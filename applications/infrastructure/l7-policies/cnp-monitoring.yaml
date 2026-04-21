@@ -28,10 +28,9 @@ spec:
           rules:
             dns:
               - matchPattern: "*"
-    - toEntities: [ cluster, kube-apiserver, world ]
+    - toEntities: [ cluster, kube-apiserver ]
+    - toEntities: [ world ]
       toPorts:
         - ports:
             - { port: "80", protocol: TCP }
             - { port: "443", protocol: TCP }
-            - { port: "6443", protocol: TCP }
-            - { port: "9090", protocol: TCP } # Prometheus (post-DNAT egress)
