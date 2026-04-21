@@ -20,11 +20,18 @@ done
 K3S_TOKEN=$(cat /vagrant/node-token)
 
 echo "[ceph-lab worker] Joining cluster at ${CONTROL_PLANE_IP}..."
+# INSTALL_K3S_SKIP_START=true prevents the installer from blocking on
+# `systemctl start k3s-agent` (a Type=notify unit that takes 1-2 min to reach
+# READY). We kick it off with --no-block so Vagrant doesn't stall per node.
+# The service is still enabled; it will join the cluster in the background.
 curl -sfL https://get.k3s.io | \
     INSTALL_K3S_CHANNEL="${K3S_CHANNEL}" \
     K3S_URL="https://${CONTROL_PLANE_IP}:6443" \
     K3S_TOKEN="${K3S_TOKEN}" \
     INSTALL_K3S_EXEC="agent --node-ip=${NODE_IP}" \
+    INSTALL_K3S_SKIP_START=true \
     sh -
 
-echo "✓ node.sh complete — worker joined"
+systemctl --no-block start k3s-agent
+
+echo "✓ node.sh complete — k3s-agent starting in background"
