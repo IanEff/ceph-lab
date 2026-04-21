@@ -5,7 +5,7 @@
 # ceph-lab — Vagrantfile
 #
 # A local k3s + Rook Ceph cluster with a full GitOps stack (ArgoCD, Cilium,
-# Prometheus, Grafana, Loki, Tempo, Alloy, cert-manager).
+# Prometheus, Grafana).
 #
 # Topology
 # ────────

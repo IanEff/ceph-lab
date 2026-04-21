@@ -19,15 +19,15 @@ spec:
   preserveFilesystemOnDelete: true
   metadataServer:
     activeCount: 1
-    activeStandby: true
+    activeStandby: false
     priorityClassName: system-cluster-critical
     resources:
       requests:
         cpu: "100m"
-        memory: "512Mi"
+        memory: "256Mi"
       limits:
         cpu: "1000m"
-        memory: "1Gi"
+        memory: "512Mi"
 ---
 # Required since Rook v1.17 — CSI does not auto-create the default subvolume group.
 apiVersion: ceph.rook.io/v1

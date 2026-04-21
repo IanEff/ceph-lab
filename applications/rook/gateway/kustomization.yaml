@@ -4,4 +4,3 @@ kind: Kustomization
 resources:
   - httproute-dashboard.yaml
   - httproute-s3.yaml
-  - httproute-s3-shared.yaml

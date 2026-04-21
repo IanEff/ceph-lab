@@ -5,8 +5,8 @@
 server:
   replicaCount: 1
 
-  retention: "15d"
-  retentionSize: "8GB"
+  retention: "7d"
+  retentionSize: "5GB"
 
   # Use CephFS RWO for metrics storage.
   persistentVolume:
@@ -30,7 +30,7 @@ server:
       memory: 256Mi
     limits:
       cpu: 500m
-      memory: 768Mi
+      memory: 512Mi
 
   global:
     scrape_interval: 30s

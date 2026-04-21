@@ -6,7 +6,3 @@ resources:
   - filesystem.yaml
   - object-store.yaml
   - toolbox.yaml
-  - object-shared-pools.yaml
-  - object-store-shared.yaml
-  - demo-buckets.yaml
-  - warp-obc.yaml

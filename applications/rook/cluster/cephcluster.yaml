@@ -100,28 +100,28 @@ spec:
         memory: "256Mi"
       limits:
         cpu: "1000m"
-        memory: "1Gi"
+        memory: "512Mi"
     mgr:
       requests:
         cpu: "100m"
         memory: "256Mi"
       limits:
         cpu: "1000m"
-        memory: "1Gi"
+        memory: "512Mi"
     osd:
       requests:
         cpu: "250m"
         memory: "512Mi"
       limits:
         cpu: "2000m"
-        memory: "2Gi"
+        memory: "1Gi"
     mds:
       requests:
         cpu: "100m"
-        memory: "512Mi"
+        memory: "256Mi"
       limits:
         cpu: "1000m"
-        memory: "1Gi"
+        memory: "512Mi"
     mgr-sidecar:
       requests:
         cpu: "100m"
