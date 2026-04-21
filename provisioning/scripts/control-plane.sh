@@ -17,7 +17,18 @@ curl -fsSL -o /tmp/get_helm.sh \
     https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
 chmod 700 /tmp/get_helm.sh && /tmp/get_helm.sh && rm /tmp/get_helm.sh
 
-echo "[2] Write k3s server config"
+echo "[2] Create swap file for control-plane memory headroom"
+# common.sh disables system swap; re-enable a dedicated swap file here so the
+# API server doesn't OOM while ArgoCD syncs before workers join.
+if ! swapon --show | grep -q '/swapfile'; then
+    fallocate -l 2G /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
+echo "[3] Write k3s server config"
 mkdir -p /etc/rancher/k3s
 cat > /etc/rancher/k3s/config.yaml <<EOF
 advertise-address: ${CONTROL_PLANE_IP}
@@ -35,17 +46,19 @@ tls-san:
   - "${CONTROL_PLANE_IP}"
   - "ceph-control"
 data-dir: "/var/lib/rancher/k3s"
+kubelet-arg:
+  - "fail-swap-on=false"
 EOF
 
-echo "[3] Install k3s server (channel: ${K3S_CHANNEL})"
+echo "[4] Install k3s server (channel: ${K3S_CHANNEL})"
 curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL="${K3S_CHANNEL}" sh -
 
-echo "[4] Wait for API server to respond"
+echo "[5] Wait for API server to respond"
 until kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get nodes &>/dev/null; do
     sleep 3
 done
 
-echo "[5] Set up kubeconfig for root + vagrant"
+echo "[6] Set up kubeconfig for root + vagrant"
 mkdir -p /root/.kube
 cp /etc/rancher/k3s/k3s.yaml /root/.kube/config
 sed -i "s/127\.0\.0\.1/${CONTROL_PLANE_IP}/g" /root/.kube/config
@@ -55,10 +68,10 @@ cp /etc/rancher/k3s/k3s.yaml /home/vagrant/.kube/config
 sed -i "s/127\.0\.0\.1/${CONTROL_PLANE_IP}/g" /home/vagrant/.kube/config
 chown -R vagrant:vagrant /home/vagrant/.kube
 
-echo "[6] Install Cilium CNI"
+echo "[7] Install Cilium CNI"
 bash /vagrant/provisioning/scripts/install_cilium.sh
 
-echo "[7] Publish join token for worker nodes"
+echo "[8] Publish join token for worker nodes"
 until [ -f /var/lib/rancher/k3s/server/node-token ]; do sleep 1; done
 install -m 644 /var/lib/rancher/k3s/server/node-token /vagrant/node-token
 
