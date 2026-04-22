@@ -35,5 +35,12 @@ configMapGenerator:
       labels:
         grafana_dashboard: "1"
 
+  - name: grafana-dashboard-ceph-observability-mach-2
+    files:
+      - ceph-observability-mach-2.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+
 generatorOptions:
   disableNameSuffixHash: true

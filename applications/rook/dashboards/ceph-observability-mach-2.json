@@ -1,0 +1,281 @@
+{
+  "uid": "ceph-obs-mach-2",
+  "title": "Ceph Observability Mach 2",
+  "tags": ["slo", "ceph", "observability", "mach-2"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "1m",
+  "time": { "from": "now-3h", "to": "now" },
+  "timepicker": {},
+  "panels": [
+    {
+      "type": "row",
+      "id": 100,
+      "title": "Row 1: \"Is the cluster healthy right now?\" — the overview they don't have",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }
+    },
+    {
+      "type": "stat",
+      "id": 1,
+      "title": "Cluster Health Status",
+      "description": "0=green, 1=yellow, 2=red. They're currently running on ceph -s to get this. Having it on a screen tells the story immediately.",
+      "gridPos": { "x": 0, "y": 1, "w": 6, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "HEALTH_OK", "color": "green", "index": 0 } } },
+            { "type": "value", "options": { "1": { "text": "HEALTH_WARN", "color": "yellow", "index": 1 } } },
+            { "type": "value", "options": { "2": { "text": "HEALTH_ERR", "color": "red", "index": 2 } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "ceph_health_status", "legendFormat": "Health", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "id": 2,
+      "title": "OSDs Up vs Total",
+      "description": "Single number, should be 1.0. When it isn't, they want to know before Claude does.",
+      "gridPos": { "x": 6, "y": 1, "w": 6, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.99 },
+              { "color": "green", "value": 1.0 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "count(ceph_osd_up == 1) / count(ceph_osd_up)", "legendFormat": "Up ratio", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "id": 3,
+      "title": "PGs not in active+clean",
+      "description": "Zero is good. Any number here means something is recovering, backfilling, or inconsistent.",
+      "gridPos": { "x": 12, "y": 1, "w": 6, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "ceph_pg_total - ceph_pg_active - ceph_pg_clean", "legendFormat": "Unhealthy PGs", "refId": "A" }]
+    },
+    {
+      "type": "gauge",
+      "id": 4,
+      "title": "Capacity Used %",
+      "description": "Hard threshold lines at 75% (warn) and 80% (critical).",
+      "gridPos": { "x": 18, "y": 1, "w": 6, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 75 },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "ceph_cluster_total_used_bytes / ceph_cluster_total_bytes * 100", "legendFormat": "Used %", "refId": "A" }]
+    },
+    {
+      "type": "row",
+      "id": 200,
+      "title": "Row 2: \"How fast is it and is it getting slower?\" — the SLI layer",
+      "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 }
+    },
+    {
+      "type": "timeseries",
+      "id": 5,
+      "title": "OSD Write Latency P99",
+      "description": "The tick ingest proxy. Every write should complete within some bound. P99 shows the tail where problems live.",
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "thresholdsStyle": { "mode": "line" } },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.1 }] }
+        }
+      },
+      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(ceph_native_osd_op_w_latency_seconds_bucket[5m])) by (le))", "legendFormat": "Write P99", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "id": 6,
+      "title": "OSD Read Latency P99",
+      "description": "The simulation read proxy. Their primary workload is reads, so this is the one the quants feel.",
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 8 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "thresholdsStyle": { "mode": "line" } },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.1 }] }
+        }
+      },
+      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(ceph_native_osd_op_r_latency_seconds_bucket[5m])) by (le))", "legendFormat": "Read P99", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "id": 7,
+      "title": "BlueStore KV Sync Latency",
+      "description": "The leading indicator. Measuring metadata commit to RocksDB. Sub-ms on enterprise NVMe. If this climbs, client latency follows.",
+      "gridPos": { "x": 0, "y": 14, "w": 12, "h": 8 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2, "fillOpacity": 10 }
+        }
+      },
+      "targets": [{ "expr": "rate(ceph_bluestore_kv_sync_lat_sum[5m]) / rate(ceph_bluestore_kv_sync_lat_count[5m])", "legendFormat": "KV Sync Latency", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "id": 8,
+      "title": "Network Throughput per Node",
+      "description": "The unsegregated network canary. When it approaches 1.25 GB/s (10G saturation), client + replication fight for the same pipe.",
+      "gridPos": { "x": 12, "y": 14, "w": 12, "h": 8 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": { "lineWidth": 2, "fillOpacity": 10 }
+        }
+      },
+      "targets": [{ "expr": "rate(node_network_receive_bytes_total{device=~\"eth.*|en.*\"}[5m])", "legendFormat": "{{instance}}", "refId": "A" }]
+    },
+    {
+      "type": "row",
+      "id": 300,
+      "title": "Row 3: \"Are we burning through our reliability budget?\" — the SLO/burn-rate layer",
+      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 1 }
+    },
+    {
+      "type": "stat",
+      "id": 9,
+      "title": "Error budget remaining — the clock",
+      "description": "SLO: 99.9% of reads < 100ms. Monthly allowance of badness. When it hits zero, you've blown the SLO.",
+      "gridPos": { "x": 0, "y": 23, "w": 8, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.2 },
+              { "color": "green", "value": 0.5 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "1 - ((1 - (sum(rate(ceph_native_osd_op_r_latency_seconds_bucket{le=\"0.1\"}[30d])) / sum(rate(ceph_native_osd_op_r_latency_seconds_count[30d])))) / 0.001)", "legendFormat": "Budget Remaining", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "id": 10,
+      "title": "Fast burn rate — the page-me-now alert",
+      "description": "1-hour burn rate. Threshold at 14.4 means consuming 2% of monthly budget per hour. Above this: wake someone up.",
+      "gridPos": { "x": 8, "y": 23, "w": 8, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 14.4 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "((sum(rate(ceph_native_osd_op_r_latency_seconds_count[1h])) - sum(rate(ceph_native_osd_op_r_latency_seconds_bucket{le=\"0.1\"}[1h]))) / sum(rate(ceph_native_osd_op_r_latency_seconds_count[1h]))) / 0.001", "legendFormat": "Burn Rate (1h)", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "id": 11,
+      "title": "Slow burn rate — the ticket-me alert",
+      "description": "6-hour burn rate. Threshold at 6. You're not on fire but you're going to be.",
+      "gridPos": { "x": 16, "y": 23, "w": 8, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 3 },
+              { "color": "red", "value": 6 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "((sum(rate(ceph_native_osd_op_r_latency_seconds_count[6h])) - sum(rate(ceph_native_osd_op_r_latency_seconds_bucket{le=\"0.1\"}[6h]))) / sum(rate(ceph_native_osd_op_r_latency_seconds_count[6h]))) / 0.001", "legendFormat": "Burn Rate (6h)", "refId": "A" }]
+    }
+  ]
+}
