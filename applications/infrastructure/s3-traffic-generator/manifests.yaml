@@ -8,7 +8,7 @@ spec:
   generateBucketName: traffic-gen
   storageClassName: rook-ceph-bucket
 ---
-# Traffic Generator — loops s5cmd to create/delete objects
+# Traffic Generator — waits for manual activation via kubectl exec
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -35,36 +35,34 @@ spec:
               echo "Waiting for bucket credentials..."
               until [ -f /s3/AWS_ACCESS_KEY_ID ]; do sleep 2; done
               
-              # Export credentials from the projected volume
+              # Create a helper script for the user
+              cat <<'EOF' > /start-traffic.sh
+              #!/bin/sh
               export AWS_ACCESS_KEY_ID=$(cat /s3/AWS_ACCESS_KEY_ID)
               export AWS_SECRET_ACCESS_KEY=$(cat /s3/AWS_SECRET_ACCESS_KEY)
               export S3_ENDPOINT="http://$(cat /s3/BUCKET_HOST):$(cat /s3/BUCKET_PORT)"
               export BUCKET_NAME=$(cat /s3/BUCKET_NAME)
               
               echo "Starting traffic generation on bucket: ${BUCKET_NAME} at ${S3_ENDPOINT}"
-              
-              # Create a small dummy file
               head -c 1024 /dev/urandom > /tmp/dummy.txt
               
               while true; do
-                # Upload some files
                 for i in $(seq 1 10); do
                   s5cmd --endpoint-url ${S3_ENDPOINT} cp /tmp/dummy.txt s3://${BUCKET_NAME}/load-test-$(date +%s)-${i}.txt
                 done
-                
-                # List files
                 s5cmd --endpoint-url ${S3_ENDPOINT} ls s3://${BUCKET_NAME}/
-                
-                # Small sleep to keep metrics flowing but not overwhelm the lab
                 sleep 5
-                
-                # Clean up old files (older than 30s) to keep storage usage stable
-                # Note: s5cmd doesn't have a direct 'find' by age, so we'll just delete the batch we just made 
-                # or similar. For metrics, we just need the Ops.
                 s5cmd --endpoint-url ${S3_ENDPOINT} rm "s3://${BUCKET_NAME}/load-test-*"
-                
                 sleep 2
               done
+              EOF
+              
+              chmod +x /start-traffic.sh
+              echo "✅ Environment ready. To start traffic, run:"
+              echo "   kubectl exec -it $(hostname) -- /start-traffic.sh"
+              
+              # Sleep forever waiting for user
+              tail -f /dev/null
           volumeMounts:
             - name: s3-creds
               mountPath: /s3
