@@ -4,7 +4,7 @@ import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 class CephLatencyExporter(BaseHTTPRequestHandler):
-    def get_osd_histograms(self):
+    def get_metrics(self):
         try:
             # Get list of all OSDs
             osd_list_cmd = ["ceph", "osd", "ls"]
@@ -13,22 +13,23 @@ class CephLatencyExporter(BaseHTTPRequestHandler):
             metrics = []
             for osd_id in osds:
                 try:
-                    # Dump histogram for each OSD
-                    perf_cmd = ["ceph", "tell", f"osd.{osd_id}", "perf", "histogram", "dump"]
-                    raw_data = subprocess.check_output(perf_cmd).decode('utf-8')
-                    data = json.loads(raw_data)
+                    # 1. Get Histogram Data
+                    perf_hist_cmd = ["ceph", "tell", f"osd.{osd_id}", "perf", "histogram", "dump"]
+                    hist_data = json.loads(subprocess.check_output(perf_hist_cmd).decode('utf-8'))
+                    osd_hist = hist_data.get("osd", {})
                     
-                    # Extract read/write histograms
-                    osd_data = data.get("osd", {})
-                    
+                    # 2. Get Summary Data (for _sum metrics)
+                    perf_dump_cmd = ["ceph", "tell", f"osd.{osd_id}", "perf", "dump"]
+                    dump_data = json.loads(subprocess.check_output(perf_dump_cmd).decode('utf-8'))
+                    osd_summary = dump_data.get("osd", {})
+
                     for op_type in ["r", "w"]:
+                        # Histogram processing
                         key = f"op_{op_type}_latency_out_bytes_histogram" if op_type == "r" else f"op_{op_type}_latency_in_bytes_histogram"
-                        hist = osd_data.get(key)
+                        hist = osd_hist.get(key)
                         if not hist:
                             continue
                         
-                        # Axis 0 is Latency (usec), Axis 1 is Size (bytes)
-                        # We aggregate across Axis 1 to get a 1D latency histogram
                         latency_axis = hist["axes"][0]
                         values_2d = hist["values"]
                         
@@ -39,29 +40,35 @@ class CephLatencyExporter(BaseHTTPRequestHandler):
                             bucket_count = sum(values_2d[i])
                             cumulative_count += bucket_count
                             
-                            # 'le' is the upper bound in seconds
                             if "max" in range_info and range_info["max"] != -1:
                                 le = float(range_info["max"]) / 1_000_000.0
                                 buckets.append((le, cumulative_count))
                         
-                        # Ensure +Inf is the last bucket and reflects the final cumulative count
                         buckets.append(("+Inf", cumulative_count))
                         
-                        # 1. Native metrics (used by prototype-observability dashboard)
-                        metric_name_native = f"ceph_native_osd_op_{op_type}_latency_seconds_bucket"
-                        count_name_native = f"ceph_native_osd_op_{op_type}_latency_seconds_count"
+                        # Labels and metric names
+                        labels = f'osd="osd.{osd_id}"'
                         
-                        # 2. Standard-ish metrics (used by elk-slo-dashboard rules)
-                        metric_name_std = f"ceph_osd_op_{op_type}_latency_bucket"
-                        count_name_std = f"ceph_osd_op_{op_type}_latency_count"
+                        # Native names (for prototype-observability)
+                        m_native_bucket = f"ceph_native_osd_op_{op_type}_latency_seconds_bucket"
+                        m_native_count = f"ceph_native_osd_op_{op_type}_latency_seconds_count"
+                        
+                        # Standard names (for elk-slo-dashboard)
+                        m_std_bucket = f"ceph_osd_op_{op_type}_latency_bucket"
+                        m_std_count = f"ceph_osd_op_{op_type}_latency_count"
+                        m_std_sum = f"ceph_osd_op_{op_type}_latency_sum"
                         
                         for le, count in buckets:
-                            metrics.append(f'{metric_name_native}{{osd="osd.{osd_id}",le="{le}"}} {count}')
-                            metrics.append(f'{metric_name_std}{{osd="osd.{osd_id}",le="{le}"}} {count}')
+                            metrics.append(f'{m_native_bucket}{{{labels},le="{le}"}} {count}')
+                            metrics.append(f'{m_std_bucket}{{{labels},le="{le}"}} {count}')
                         
-                        metrics.append(f'{count_name_native}{{osd="osd.{osd_id}"}} {cumulative_count}')
-                        metrics.append(f'{count_name_std}{{osd="osd.{osd_id}"}} {cumulative_count}')
-                
+                        metrics.append(f'{m_native_count}{{{labels}}} {cumulative_count}')
+                        metrics.append(f'{m_std_count}{{{labels}}} {cumulative_count}')
+                        
+                        # Get sum from summary data
+                        sum_val = osd_summary.get(f"op_{op_type}_latency", {}).get("sum", 0)
+                        metrics.append(f'{m_std_sum}{{{labels}}} {sum_val}')
+
                 except Exception as e:
                     print(f"Error scraping OSD {osd_id}: {e}")
             
@@ -75,7 +82,7 @@ class CephLatencyExporter(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-type", "text/plain")
             self.end_headers()
-            self.wfile.write(self.get_osd_histograms().encode('utf-8'))
+            self.wfile.write(self.get_metrics().encode('utf-8'))
         else:
             self.send_response(404)
             self.end_headers()

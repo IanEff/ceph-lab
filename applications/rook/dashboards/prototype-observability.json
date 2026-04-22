@@ -234,11 +234,11 @@
     {
       "type": "stat",
       "id": 9,
-      "title": "Active Slow Ops",
-      "description": "Number of active operations exceeding the Ceph slow_op threshold.",
+      "title": "Recent Slow Writes (>100ms)",
+      "description": "Rate of write operations exceeding the 100ms SLO threshold.",
       "gridPos": { "x": 0, "y": 31, "w": 8, "h": 4 },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "colorMode": "background",
         "graphMode": "area"
       },
@@ -248,13 +248,13 @@
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "red", "value": 5 }
+              { "color": "yellow", "value": 0.1 },
+              { "color": "red", "value": 1 }
             ]
           }
         }
       },
-      "targets": [{ "expr": "ceph_healthcheck_slow_ops", "legendFormat": "Slow Ops", "refId": "A" }]
+      "targets": [{ "expr": "sum(rate(ceph_osd_op_w_latency_count[1m])) - sum(rate(ceph_osd_op_w_latency_bucket{le=\"0.099999\"}[1m]))", "legendFormat": "Slow Writes/s", "refId": "A" }]
     },
     {
       "type": "stat",

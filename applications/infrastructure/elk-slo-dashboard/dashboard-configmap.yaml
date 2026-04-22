@@ -207,7 +207,7 @@ data:
           },
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, sum(rate(ceph_osd_op_w_latency_sum[5m])) by (le) / ignoring(le) sum(rate(ceph_osd_op_w_latency_count[5m])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(ceph_osd_op_w_latency_bucket[5m])) by (le))",
               "legendFormat": "Write P99",
               "refId": "A"
             }
@@ -243,7 +243,7 @@ data:
           },
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, sum(rate(ceph_osd_op_r_latency_sum[5m])) by (le) / ignoring(le) sum(rate(ceph_osd_op_r_latency_count[5m])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(ceph_osd_op_r_latency_bucket[5m])) by (le))",
               "legendFormat": "Read P99",
               "refId": "A"
             }
