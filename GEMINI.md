@@ -59,6 +59,7 @@ The `infrastructure-set` ApplicationSet auto-discovers it. No other file needs e
 | 20 | rook-operator | **false** | true |
 | 25 | rook-cluster + PostSync gate | **false** | **false** |
 | 30 | rook-storage (pools, fs, object) | true | true |
+| 30 | ceph-latency-bridge (SLO metrics) | true | true |
 | 31 | rook-dashboards (Grafana CMs) | true | true |
 | 32 | elk-slo-dashboard (Ceph OSD SLO) | true | true |
 | 35 | rook-gateway (routes) | true | true |
@@ -78,7 +79,12 @@ This project contains custom Gemini CLI skills in `.github/skills/`. For GitOps 
 3. **Gateway API manifests must include API-defaulted fields** — See `docs/gitops-argocd-lessons.md` §3. Omitting them causes permanent ArgoCD OutOfSync loops.
 4. **`CephFilesystemSubVolumeGroup` is required** (Rook ≥ v1.17) — without it, CephFS dynamic provisioning silently fails.
 5. **ArgoCD runs insecure** — TLS is disabled. Cilium Gateway runs HTTP-only (port 80). Service URLs work at http://*.ceph.lab.
-6. **L7 Policies (CNP) are in effect** — Cilium Network Policies in `applications/infrastructure/l7-policies/` enforce strict network isolation. If a new component needs to communicate externally or across namespaces, ensure appropriate policies exist.
+6. **L7 Policies (CNP) are in effect** — Cilium Network Policies in `applications/infrastructure/l7-policies/` enforce strict network isolation. If a new component needs to communicate externally or across namespaces, ensure appropriate policies exist. **Crucial**: Egress to the Kubernetes API server (port 443) must be explicitly allowed for components that need to query the API (like `kube-state-metrics`).
+7. **OSD Performance Histograms are coarse** — Ceph Squid OSD histograms have a minimum granularity of 100ms. SLOs requiring higher resolution (e.g., 50ms) cannot be tracked via the `ceph-latency-bridge` and should use CSI metrics instead.
+8. **Resource Limits in Monitoring** — Prometheus-related components (especially `kube-state-metrics` and `prometheus-server`) are resource-heavy in this lab environment. If they enter `CrashLoopBackOff`, check memory limits first; `kube-state-metrics` needs at least 256Mi and `prometheus-server` needs 1Gi to handle substantial dashboards.
+9. **ArgoCD Sync Loops during Debugging** — When performing emergency manual fixes via `kubectl patch/apply`, ArgoCD's `selfHeal` will often immediately revert them. To stop this loop, disable sync on the **root app** (`ceph-lab-root`) first, then the specific Application, then perform your fix. Don't forget to re-enable them after pushing to Git.
+10. **Histogram Bucket Ordering** — Custom Prometheus exporters (like `ceph-latency-bridge`) MUST export histogram buckets in strictly ascending `le` order with `+Inf` at the end. Out-of-order buckets will cause Prometheus to discard the metrics.
+
 
 ---
 
@@ -95,6 +101,7 @@ applications/
     cilium/         # CNI & Gateway
     l7-policies/    # Network security policies
     elk-slo-dashboard/ # Ceph OSD SLO alerts and dashboard
+    ceph-latency-bridge/ # Native OSD histogram reconstruction
   clusters/ceph-lab/ # ApplicationSet (infra-set.yaml) + per-wave Rook Applications
   rook/             # Kustomize bases for rook-operator, cluster, storage, gateway, and dashboards
 cluster-bootstrap/
