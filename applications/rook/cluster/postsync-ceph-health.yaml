@@ -34,14 +34,13 @@ spec:
             - |
               set -e
 
-              echo "==> PostSync gate: waiting for CephCluster state=Connected"
+              echo "==> PostSync gate: waiting for CephCluster state=Connected|Created|Ready"
               until kubectl get cephcluster rook-ceph -n rook-ceph \
                   -o jsonpath='{.status.state}' 2>/dev/null \
-                  | grep -q '^Connected$'; do
+                  | grep -qE '^(Connected|Created|Ready)$'; do
                 printf "    state=%s\n" \
                   "$(kubectl get cephcluster rook-ceph -n rook-ceph \
-                      -o jsonpath='{.status.state}' 2>/dev/null || echo '<not set yet>')"
-                sleep 15
+                      -o jsonpath='{.status.state}' 2>/dev/null || echo '<not set yet>')"                sleep 15
               done
 
               echo "==> State: Connected. Waiting for HEALTH_OK..."
