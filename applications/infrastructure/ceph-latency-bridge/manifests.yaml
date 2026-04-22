@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ceph-latency-bridge
+  namespace: rook-ceph
+  labels:
+    app: ceph-latency-bridge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ceph-latency-bridge
+  template:
+    metadata:
+      labels:
+        app: ceph-latency-bridge
+    spec:
+      dnsPolicy: ClusterFirstWithHostNet
+      serviceAccountName: rook-ceph-default
+      containers:
+        - name: bridge
+          image: quay.io/ceph/ceph:v19.2.2
+          command:
+            - /bin/bash
+            - -c
+            - |
+              # Bootstrap ceph.conf
+              MON_ENDPOINTS=$(cat /etc/rook/mon-endpoints | tr ',' '\n' | awk -F= '{print $2}' | paste -sd,)
+              echo "[global]" > /etc/ceph/ceph.conf
+              echo "mon host = ${MON_ENDPOINTS}" >> /etc/ceph/ceph.conf
+              echo "auth cluster required = cephx" >> /etc/ceph/ceph.conf
+              echo "auth service required = cephx" >> /etc/ceph/ceph.conf
+              echo "auth client required  = cephx" >> /etc/ceph/ceph.conf
+              
+              CEPH_SECRET=$(cat /var/lib/rook-ceph-mon/secret.keyring)
+              printf '[client.admin]\n\tkey = %s\n' "${CEPH_SECRET}" > /etc/ceph/keyring
+              
+              # Run the exporter script
+              python3 /opt/ceph-exporter/ceph_latency_exporter.py
+          ports:
+            - containerPort: 8080
+              name: metrics
+          volumeMounts:
+            - mountPath: /etc/ceph
+              name: ceph-config
+            - mountPath: /etc/rook
+              name: mon-endpoint-volume
+            - mountPath: /var/lib/rook-ceph-mon
+              name: ceph-admin-secret
+              readOnly: true
+            - mountPath: /opt/ceph-exporter
+              name: script-volume
+      volumes:
+        - name: ceph-admin-secret
+          secret:
+            secretName: rook-ceph-mon
+            items:
+              - key: ceph-secret
+                path: secret.keyring
+        - name: mon-endpoint-volume
+          configMap:
+            name: rook-ceph-mon-endpoints
+            items:
+              - key: data
+                path: mon-endpoints
+        - name: ceph-config
+          emptyDir: {}
+        - name: script-volume
+          configMap:
+            name: ceph-latency-exporter-script
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ceph-latency-bridge
+  namespace: rook-ceph
+  labels:
+    app: ceph-latency-bridge
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: metrics
+  selector:
+    app: ceph-latency-bridge
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ceph-latency-bridge
+  namespace: rook-ceph
+  labels:
+    team: infra
+spec:
+  selector:
+    matchLabels:
+      app: ceph-latency-bridge
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics

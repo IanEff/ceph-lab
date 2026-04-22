@@ -1,0 +1,6 @@
+{
+    "appName": "ceph-latency-bridge",
+    "syncWave": "30",
+    "namespace": "rook-ceph",
+    "localPath": "applications/infrastructure/ceph-latency-bridge"
+}

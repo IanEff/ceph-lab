@@ -4,7 +4,7 @@
   "tags": ["prototype", "slo", "ceph", "observability"],
   "timezone": "browser",
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "refresh": "1m",
   "time": { "from": "now-3h", "to": "now" },
   "timepicker": {},
@@ -165,10 +165,42 @@
     },
     {
       "type": "timeseries",
+      "id": 12,
+      "title": "OSD Write Latency P99 (Native Histogram)",
+      "description": "Calculated from OSD 2D histograms. True tail latency for quants.",
+      "gridPos": { "x": 0, "y": 14, "w": 12, "h": 8 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "thresholdsStyle": { "mode": "line" } },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.05 }] }
+        }
+      },
+      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(ceph_native_osd_op_w_latency_seconds_bucket[5m])) by (le))", "legendFormat": "Write P99", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "id": 13,
+      "title": "OSD Read Latency P99 (Native Histogram)",
+      "description": "Calculated from OSD 2D histograms. True tail latency for simulations.",
+      "gridPos": { "x": 12, "y": 14, "w": 12, "h": 8 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "thresholdsStyle": { "mode": "line" } },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.05 }] }
+        }
+      },
+      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(ceph_native_osd_op_r_latency_seconds_bucket[5m])) by (le))", "legendFormat": "Read P99", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
       "id": 7,
       "title": "BlueStore KV Sync Latency (Leading Indicator)",
-      "description": "Metadata commit to RocksDB. Sub-ms on enterprise NVMe. Consumer NVMe climbers warn of future client latency.",
-      "gridPos": { "x": 0, "y": 14, "w": 12, "h": 8 },
+      "description": "Metadata commit to RocksDB. Sub-ms on enterprise NVMe.",
+      "gridPos": { "x": 0, "y": 22, "w": 12, "h": 8 },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "fieldConfig": {
         "defaults": {
@@ -182,8 +214,8 @@
       "type": "timeseries",
       "id": 8,
       "title": "Network Throughput per Node (NIC canary)",
-      "description": "Overlay across nodes. Approaching 1.25 GB/s (10G saturation) shows client+replication contention.",
-      "gridPos": { "x": 12, "y": 14, "w": 12, "h": 8 },
+      "description": "Overlay across nodes. Approaching 1.25 GB/s shows congestion.",
+      "gridPos": { "x": 12, "y": 22, "w": 12, "h": 8 },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "fieldConfig": {
         "defaults": {
@@ -197,14 +229,14 @@
       "type": "row",
       "id": 300,
       "title": "Are we burning through our reliability budget? — SLO layer",
-      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 1 }
+      "gridPos": { "x": 0, "y": 30, "w": 24, "h": 1 }
     },
     {
       "type": "stat",
       "id": 9,
       "title": "Active Slow Ops",
-      "description": "Number of active operations exceeding the Ceph slow_op threshold. This is our proxy for 'bad events' until histogram buckets are enabled.",
-      "gridPos": { "x": 0, "y": 23, "w": 8, "h": 4 },
+      "description": "Number of active operations exceeding the Ceph slow_op threshold.",
+      "gridPos": { "x": 0, "y": 31, "w": 8, "h": 4 },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "colorMode": "background",
@@ -226,10 +258,62 @@
     },
     {
       "type": "stat",
+      "id": 14,
+      "title": "Read SLO Success Rate (Ops < 50ms)",
+      "description": "% of read operations meeting the 50ms latency target.",
+      "gridPos": { "x": 8, "y": 31, "w": 8, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.95 },
+              { "color": "green", "value": 0.99 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "sum(rate(ceph_native_osd_op_r_latency_seconds_bucket{le=\"0.05\"}[5m])) / sum(rate(ceph_native_osd_op_r_latency_seconds_count[5m]))", "legendFormat": "Success Rate", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "id": 15,
+      "title": "Write SLO Success Rate (Ops < 50ms)",
+      "description": "% of write operations meeting the 50ms latency target.",
+      "gridPos": { "x": 16, "y": 31, "w": 8, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.95 },
+              { "color": "green", "value": 0.99 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "sum(rate(ceph_native_osd_op_w_latency_seconds_bucket{le=\"0.05\"}[5m])) / sum(rate(ceph_native_osd_op_w_latency_seconds_count[5m]))", "legendFormat": "Success Rate", "refId": "A" }]
+    },
+    {
+      "type": "stat",
       "id": 10,
       "title": "OSD Read Performance Index",
       "description": "Current Avg Read Latency relative to 50ms target. 1.0 = on target, >1.0 = failing target.",
-      "gridPos": { "x": 8, "y": 23, "w": 8, "h": 4 },
+      "gridPos": { "x": 0, "y": 35, "w": 12, "h": 4 },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "colorMode": "background",
@@ -254,7 +338,7 @@
       "id": 11,
       "title": "OSD Write Performance Index",
       "description": "Current Avg Write Latency relative to 50ms target. 1.0 = on target, >1.0 = failing target.",
-      "gridPos": { "x": 16, "y": 23, "w": 8, "h": 4 },
+      "gridPos": { "x": 12, "y": 35, "w": 12, "h": 4 },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "colorMode": "background",

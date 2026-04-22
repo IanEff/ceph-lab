@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: rook-ceph
+
+resources:
+  - manifests.yaml
+
+configMapGenerator:
+  - name: ceph-latency-exporter-script
+    files:
+      - ceph_latency_exporter.py=../../../provisioning/scripts/ceph_latency_exporter.py
