@@ -1,0 +1,6 @@
+{
+    "appName": "s3-traffic-generator",
+    "syncWave": "40",
+    "namespace": "default",
+    "localPath": "applications/infrastructure/s3-traffic-generator"
+}

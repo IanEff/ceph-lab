@@ -1,0 +1,46 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: elk-slo-burn-rates
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: elk.slo.write_latency
+      interval: 30s
+      rules:
+        # Burn rate = fraction of error budget consumed per unit time, relative to the
+        # budget consumption rate that would exhaust it in exactly 1 window.
+        # error_rate = fraction of writes that exceeded the 50 ms SLO threshold.
+        # burn_rate  = error_rate / (1 - 0.99)  →  >1 means budget is depleting.
+        - record: slo:ceph_osd_write_latency_burn_rate:1h
+          expr: |
+            (
+              1 - sum(rate(ceph_osd_op_w_latency_bucket{le="0.05"}[1h]))
+                / sum(rate(ceph_osd_op_w_latency_count[1h]))
+            ) / (1 - 0.99)
+
+        - record: slo:ceph_osd_write_latency_burn_rate:6h
+          expr: |
+            (
+              1 - sum(rate(ceph_osd_op_w_latency_bucket{le="0.05"}[6h]))
+                / sum(rate(ceph_osd_op_w_latency_count[6h]))
+            ) / (1 - 0.99)
+
+    - name: elk.slo.alerts
+      rules:
+        # Fast-burn alert: if 1h burn rate > 14.4 the error budget will be exhausted
+        # in under 2 days. Require 5 m of sustained burn before paging.
+        - alert: CephWriteSLOFastBurn
+          expr: slo:ceph_osd_write_latency_burn_rate:1h > 14.4
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Ceph write latency SLO fast burn (burn rate {{ $value | humanize }})"
+            description: >
+              The 1-hour OSD write-latency burn rate is {{ $value | humanize }}×, which
+              exceeds the fast-burn threshold of 14.4×. At this rate the 28-day error
+              budget will be exhausted within ~2 days. Investigate OSD performance
+              immediately (slow ops, disk I/O, network).

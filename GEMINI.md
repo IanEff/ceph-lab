@@ -21,9 +21,8 @@ from git — no manual kubectl applies.
 | CNI, LB & L7 Policies | Cilium | 1.18.2 |
 | Storage | Rook + Ceph Squid | v1.19.1 / v19.2.2 |
 | GitOps | ArgoCD | stable |
-| TLS | cert-manager | v1.17.2 |
-| Ingress | Gateway API (Cilium) | v1.4.1 |
-| Observability | Prometheus, Grafana, Alloy, metrics-server | |
+| Ingress | Gateway API (Cilium) | v1.4.1 (HTTP only) |
+| Observability | Prometheus, Grafana | |
 
 ---
 
@@ -35,9 +34,10 @@ All network values live in `applications/config/gitops.env`. The Kustomize Compo
 component that includes `components: [../../config]`.
 
 ### 2. GITOPS_REPO_URL is a literal placeholder
-Every `Application`/`ApplicationSet` YAML contains the string `GITOPS_REPO_URL`.
+Every `Application`/`ApplicationSet` YAML should contain the string `GITOPS_REPO_URL`.
 `install_argocd.sh` substitutes the real URL with `sed` at bootstrap time.
-**Never commit a substituted URL.**
+**Note**: Some files in the repository may have already been committed with the
+substituted URL (`git@github.com:ianeff/ceph-lab.git`). Prefer the placeholder for new files.
 
 ### 3. Adding a new infrastructure component
 Create `applications/infrastructure/<name>/config.json`:
@@ -53,14 +53,14 @@ The `infrastructure-set` ApplicationSet auto-discovers it. No other file needs e
 | -15 | gateway-api CRDs | true | true |
 | -10 | cilium | true | true |
 | -6 | prometheus-operator-crds | true | true |
-| -5 | cert-manager, prometheus, grafana | true | true |
-| 0 | alloy, metrics-server | true | true |
+| -5 | prometheus, grafana | true | true |
 | 1 | l7-policies (CiliumNetworkPolicies) | true | true |
 | 10 | argocd-ingress | true | true |
 | 20 | rook-operator | **false** | true |
 | 25 | rook-cluster + PostSync gate | **false** | **false** |
 | 30 | rook-storage (pools, fs, object) | true | true |
 | 31 | rook-dashboards (Grafana CMs) | true | true |
+| 32 | elk-slo-dashboard (Ceph OSD SLO) | true | true |
 | 35 | rook-gateway (routes) | true | true |
 
 ### 5. Helm is always via Kustomize
@@ -77,9 +77,8 @@ This project contains custom Gemini CLI skills in `.github/skills/`. For GitOps 
 2. **OSD disks must stay raw** — pre-formatting any block device breaks Rook auto-discovery.
 3. **Gateway API manifests must include API-defaulted fields** — See `docs/gitops-argocd-lessons.md` §3. Omitting them causes permanent ArgoCD OutOfSync loops.
 4. **`CephFilesystemSubVolumeGroup` is required** (Rook ≥ v1.17) — without it, CephFS dynamic provisioning silently fails.
-5. **ArgoCD runs insecure** — TLS terminates at Cilium Gateway using cert-manager self-signed `*.ceph.lab` wildcard.
+5. **ArgoCD runs insecure** — TLS is disabled. Cilium Gateway runs HTTP-only (port 80). Service URLs work at http://*.ceph.lab.
 6. **L7 Policies (CNP) are in effect** — Cilium Network Policies in `applications/infrastructure/l7-policies/` enforce strict network isolation. If a new component needs to communicate externally or across namespaces, ensure appropriate policies exist.
-7. **Hubble metrics are collected via Alloy** — Prometheus scrapes Alloy, which in turn scrapes Hubble. Ensure `l7-visibility` policies allow this path.
 
 ---
 
@@ -90,14 +89,12 @@ This project contains custom Gemini CLI skills in `.github/skills/`. For GitOps 
 applications/
   config/           # gitops.env (single source of truth) + Kustomize Component
   infrastructure/   # One dir per infra component:
-    alloy/          # Metric collection agent
     prometheus/     # Time-series database
     grafana/        # Dashboards & Visualization
     prometheus-operator-crds/ # Foundation for monitoring CRDs
     cilium/         # CNI & Gateway
     l7-policies/    # Network security policies
-    cert-manager/   # TLS certificate management
-    metrics-server/ # Core K8s metrics
+    elk-slo-dashboard/ # Ceph OSD SLO alerts and dashboard
   clusters/ceph-lab/ # ApplicationSet (infra-set.yaml) + per-wave Rook Applications
   rook/             # Kustomize bases for rook-operator, cluster, storage, gateway, and dashboards
 cluster-bootstrap/
