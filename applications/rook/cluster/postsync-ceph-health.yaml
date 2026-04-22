@@ -26,8 +26,8 @@ spec:
       restartPolicy: Never
       containers:
         - name: wait
-          # Pin to the same minor version as the k3s cluster (1.32).
-          image: docker.io/bitnami/kubectl:1.32.2
+          # Use Rancher's kubectl which is highly reliable in k3s.
+          image: rancher/kubectl:v1.32.2
           command:
             - sh
             - -c
