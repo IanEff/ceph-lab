@@ -115,7 +115,7 @@ Vagrant.configure("2") do |config|
   config.vm.define "ceph-control" do |cp|
     cp.vm.hostname = "ceph-control"
     cp.vm.network "private_network", ip: CONFIG[:control_plane_ip]
-    configure_vbox.call(cp, name: "ceph-control", memory: 4096, cpus: 2)
+    configure_vbox.call(cp, name: "ceph-control", memory: 6144, cpus: 2)
     cp.vm.provision "shell", path: "provisioning/scripts/common.sh",       env: base_env
     cp.vm.provision "shell", path: "provisioning/scripts/control-plane.sh", env: base_env
     if CONFIG[:install_argocd]
@@ -129,7 +129,7 @@ Vagrant.configure("2") do |config|
       node.vm.hostname = "ceph-node-#{i}"
       node.vm.network "private_network", ip: "192.168.56.#{CONFIG[:ceph_node_ip_base] + i}"
       configure_vbox.call(node, name: "ceph-node-#{i}",
-                               memory: 6144, cpus: 3,
+                               memory: 8192, cpus: 3,
                                osd_disks: CONFIG[:osd_disks])
       node.vm.provision "shell", path: "provisioning/scripts/common.sh", env: base_env
       node.vm.provision "shell", path: "provisioning/scripts/node.sh",   env: base_env

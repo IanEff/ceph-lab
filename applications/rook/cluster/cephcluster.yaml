@@ -64,7 +64,7 @@ spec:
       osd_max_backfills: "1"
       osd_recovery_max_active: "1"
       osd_recovery_op_priority: "3"
-      osd_memory_target: "1610612736" # 1.5Gi — give more cache headroom
+      osd_memory_target: "2147483648" # 2Gi — stable for 8GB nodes
 
   # ── Ops safety ────────────────────────────────────────────────────────────
   crashCollector:
@@ -101,28 +101,28 @@ spec:
         memory: "256Mi"
       limits:
         cpu: "1000m"
-        memory: "1.5Gi"
+        memory: "2Gi"
     mgr:
       requests:
         cpu: "100m"
         memory: "256Mi"
       limits:
         cpu: "1000m"
-        memory: "1.5Gi"
+        memory: "2Gi"
     osd:
       requests:
         cpu: "250m"
         memory: "512Mi"
       limits:
         cpu: "2000m"
-        memory: "2.5Gi"
+        memory: "3Gi"
     mds:
       requests:
         cpu: "100m"
         memory: "256Mi"
       limits:
         cpu: "1000m"
-        memory: "1.5Gi"
+        memory: "2Gi"
     mgr-sidecar:
       requests:
         cpu: "100m"
