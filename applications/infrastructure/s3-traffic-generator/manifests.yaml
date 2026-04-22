@@ -48,11 +48,11 @@ spec:
               
               while true; do
                 for i in $(seq 1 10); do
-                  s5cmd --endpoint-url ${S3_ENDPOINT} cp /tmp/dummy.txt s3://${BUCKET_NAME}/load-test-$(date +%s)-${i}.txt
+                  /s5cmd --endpoint-url ${S3_ENDPOINT} cp /tmp/dummy.txt s3://${BUCKET_NAME}/load-test-$(date +%s)-${i}.txt
                 done
-                s5cmd --endpoint-url ${S3_ENDPOINT} ls s3://${BUCKET_NAME}/
+                /s5cmd --endpoint-url ${S3_ENDPOINT} ls s3://${BUCKET_NAME}/
                 sleep 5
-                s5cmd --endpoint-url ${S3_ENDPOINT} rm "s3://${BUCKET_NAME}/load-test-*"
+                /s5cmd --endpoint-url ${S3_ENDPOINT} rm "s3://${BUCKET_NAME}/load-test-*"
                 sleep 2
               done
               EOF
