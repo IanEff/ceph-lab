@@ -27,7 +27,7 @@ spec:
         memory: "256Mi"
       limits:
         cpu: "1000m"
-        memory: "1Gi"
+        memory: "1.5Gi"
 ---
 # Required since Rook v1.17 — CSI does not auto-create the default subvolume group.
 apiVersion: ceph.rook.io/v1

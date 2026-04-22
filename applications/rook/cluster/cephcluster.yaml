@@ -64,7 +64,7 @@ spec:
       osd_max_backfills: "1"
       osd_recovery_max_active: "1"
       osd_recovery_op_priority: "3"
-      osd_memory_target: "1073741824" # 1Gi — safe now with reduced CSI overhead
+      osd_memory_target: "1610612736" # 1.5Gi — give more cache headroom
 
   # ── Ops safety ────────────────────────────────────────────────────────────
   crashCollector:
@@ -101,28 +101,28 @@ spec:
         memory: "256Mi"
       limits:
         cpu: "1000m"
-        memory: "1Gi"
+        memory: "1.5Gi"
     mgr:
       requests:
         cpu: "100m"
         memory: "256Mi"
       limits:
         cpu: "1000m"
-        memory: "1Gi"
+        memory: "1.5Gi"
     osd:
       requests:
         cpu: "250m"
         memory: "512Mi"
       limits:
         cpu: "2000m"
-        memory: "2Gi"
+        memory: "2.5Gi"
     mds:
       requests:
         cpu: "100m"
         memory: "256Mi"
       limits:
         cpu: "1000m"
-        memory: "1Gi"
+        memory: "1.5Gi"
     mgr-sidecar:
       requests:
         cpu: "100m"
