@@ -26,8 +26,8 @@ spec:
       restartPolicy: Never
       containers:
         - name: wait
-          # Use Rancher's kubectl which is highly reliable in k3s.
-          image: rancher/kubectl:v1.32.2
+          # Use alpine/k8s which includes a shell and kubectl.
+          image: alpine/k8s:1.32.2
           command:
             - sh
             - -c
