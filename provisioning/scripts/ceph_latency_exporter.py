@@ -19,7 +19,6 @@ class CephLatencyExporter(BaseHTTPRequestHandler):
                     data = json.loads(raw_data)
                     
                     # Extract read/write histograms
-                    # Path: data["osd"]["op_r_latency_out_bytes_histogram"]
                     osd_data = data.get("osd", {})
                     
                     for op_type in ["r", "w"]:
@@ -33,23 +32,35 @@ class CephLatencyExporter(BaseHTTPRequestHandler):
                         latency_axis = hist["axes"][0]
                         values_2d = hist["values"]
                         
+                        buckets = []
                         cumulative_count = 0
+                        
                         for i, range_info in enumerate(latency_axis["ranges"]):
-                            # 'le' is the upper bound in seconds
-                            if "max" in range_info and range_info["max"] != -1:
-                                le = float(range_info["max"]) / 1_000_000.0
-                            else:
-                                le = "+Inf"
-                            
-                            # Sum up all sizes for this latency bucket
                             bucket_count = sum(values_2d[i])
                             cumulative_count += bucket_count
                             
-                            metric_name = f"ceph_native_osd_op_{op_type}_latency_seconds_bucket"
-                            metrics.append(f'{metric_name}{{osd="osd.{osd_id}",le="{le}"}} {cumulative_count}')
+                            # 'le' is the upper bound in seconds
+                            if "max" in range_info and range_info["max"] != -1:
+                                le = float(range_info["max"]) / 1_000_000.0
+                                buckets.append((le, cumulative_count))
                         
-                        # Add the total count
-                        metrics.append(f'ceph_native_osd_op_{op_type}_latency_seconds_count{{osd="osd.{osd_id}"}} {cumulative_count}')
+                        # Ensure +Inf is the last bucket and reflects the final cumulative count
+                        buckets.append(("+Inf", cumulative_count))
+                        
+                        # 1. Native metrics (used by prototype-observability dashboard)
+                        metric_name_native = f"ceph_native_osd_op_{op_type}_latency_seconds_bucket"
+                        count_name_native = f"ceph_native_osd_op_{op_type}_latency_seconds_count"
+                        
+                        # 2. Standard-ish metrics (used by elk-slo-dashboard rules)
+                        metric_name_std = f"ceph_osd_op_{op_type}_latency_bucket"
+                        count_name_std = f"ceph_osd_op_{op_type}_latency_count"
+                        
+                        for le, count in buckets:
+                            metrics.append(f'{metric_name_native}{{osd="osd.{osd_id}",le="{le}"}} {count}')
+                            metrics.append(f'{metric_name_std}{{osd="osd.{osd_id}",le="{le}"}} {count}')
+                        
+                        metrics.append(f'{count_name_native}{{osd="osd.{osd_id}"}} {cumulative_count}')
+                        metrics.append(f'{count_name_std}{{osd="osd.{osd_id}"}} {cumulative_count}')
                 
                 except Exception as e:
                     print(f"Error scraping OSD {osd_id}: {e}")
