@@ -42,6 +42,16 @@ datasources:
 # Rules are managed in the Grafana UI or via provisioning ConfigMaps.
 alerting: {}
 
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: NotIn
+              values:
+                - ceph-control
+
 persistence:
   enabled: false # Dashboards loaded from ConfigMaps; no state to persist.
 
