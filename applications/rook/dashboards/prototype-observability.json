@@ -134,8 +134,8 @@
     {
       "type": "timeseries",
       "id": 5,
-      "title": "OSD Write Latency P99",
-      "description": "The tick ingest proxy. Tail latency where trading problems live.",
+      "title": "OSD Write Latency AVG",
+      "description": "The tick ingest proxy. Average latency of OSD write operations. Red line = 50ms warning.",
       "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "fieldConfig": {
@@ -145,13 +145,13 @@
           "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.05 }] }
         }
       },
-      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(ceph_osd_op_w_latency_bucket[5m])) by (le))", "legendFormat": "Write P99", "refId": "A" }]
+      "targets": [{ "expr": "sum(rate(ceph_osd_op_w_latency_sum[5m])) / sum(rate(ceph_osd_op_w_latency_count[5m]))", "legendFormat": "Write Avg", "refId": "A" }]
     },
     {
       "type": "timeseries",
       "id": 6,
-      "title": "OSD Read Latency P99",
-      "description": "The simulation read proxy. This is the one the quants feel.",
+      "title": "OSD Read Latency AVG",
+      "description": "The simulation read proxy. Average latency of OSD read operations. Red line = 50ms warning.",
       "gridPos": { "x": 12, "y": 6, "w": 12, "h": 8 },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "fieldConfig": {
@@ -161,7 +161,7 @@
           "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.05 }] }
         }
       },
-      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(ceph_osd_op_r_latency_bucket[5m])) by (le))", "legendFormat": "Read P99", "refId": "A" }]
+      "targets": [{ "expr": "sum(rate(ceph_osd_op_r_latency_sum[5m])) / sum(rate(ceph_osd_op_r_latency_count[5m]))", "legendFormat": "Read Avg", "refId": "A" }]
     },
     {
       "type": "timeseries",
@@ -202,34 +202,33 @@
     {
       "type": "stat",
       "id": 9,
-      "title": "Error Budget Remaining (30d)",
-      "description": "99.9% of OSD reads complete within 50ms. 0% means you've blown the monthly SLO.",
+      "title": "Active Slow Ops",
+      "description": "Number of active operations exceeding the Ceph slow_op threshold. This is our proxy for 'bad events' until histogram buckets are enabled.",
       "gridPos": { "x": 0, "y": 23, "w": 8, "h": 4 },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "colorMode": "background",
-        "graphMode": "none"
+        "graphMode": "area"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 10 },
-              { "color": "green", "value": 50 }
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
             ]
           }
         }
       },
-      "targets": [{ "expr": "1 - (sum(rate(ceph_osd_op_r_latency_bucket{le=\"+Inf\"}[30d])) - sum(rate(ceph_osd_op_r_latency_bucket{le=\"0.05\"}[30d]))) / (sum(rate(ceph_osd_op_r_latency_bucket{le=\"+Inf\"}[30d])) * 0.001)", "legendFormat": "Budget %", "refId": "A" }]
+      "targets": [{ "expr": "ceph_healthcheck_slow_ops", "legendFormat": "Slow Ops", "refId": "A" }]
     },
     {
       "type": "stat",
       "id": 10,
-      "title": "Fast Burn Rate (1h)",
-      "description": "Threshold at 14.4 (consuming 2% of budget/hour). WAKE SOMEONE UP.",
+      "title": "OSD Read Performance Index",
+      "description": "Current Avg Read Latency relative to 50ms target. 1.0 = on target, >1.0 = failing target.",
       "gridPos": { "x": 8, "y": 23, "w": 8, "h": 4 },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
@@ -242,18 +241,19 @@
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "red", "value": 14.4 }
+              { "color": "yellow", "value": 0.8 },
+              { "color": "red", "value": 1.0 }
             ]
           }
         }
       },
-      "targets": [{ "expr": "(sum(rate(ceph_osd_op_r_latency_bucket{le=\"+Inf\"}[1h])) - sum(rate(ceph_osd_op_r_latency_bucket{le=\"0.05\"}[1h]))) / sum(rate(ceph_osd_op_r_latency_bucket{le=\"+Inf\"}[1h])) / 0.001", "legendFormat": "1h Burn", "refId": "A" }]
+      "targets": [{ "expr": "(sum(rate(ceph_osd_op_r_latency_sum[5m])) / sum(rate(ceph_osd_op_r_latency_count[5m]))) / 0.05", "legendFormat": "Index", "refId": "A" }]
     },
     {
       "type": "stat",
       "id": 11,
-      "title": "Slow Burn Rate (6h)",
-      "description": "Threshold at 6. Ticket-me alert: you're not on fire but you're going to be.",
+      "title": "OSD Write Performance Index",
+      "description": "Current Avg Write Latency relative to 50ms target. 1.0 = on target, >1.0 = failing target.",
       "gridPos": { "x": 16, "y": 23, "w": 8, "h": 4 },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
@@ -266,12 +266,13 @@
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "yellow", "value": 6 }
+              { "color": "yellow", "value": 0.8 },
+              { "color": "red", "value": 1.0 }
             ]
           }
         }
       },
-      "targets": [{ "expr": "(sum(rate(ceph_osd_op_r_latency_bucket{le=\"+Inf\"}[6h])) - sum(rate(ceph_osd_op_r_latency_bucket{le=\"0.05\"}[6h]))) / sum(rate(ceph_osd_op_r_latency_bucket{le=\"+Inf\"}[6h])) / 0.001", "legendFormat": "6h Burn", "refId": "A" }]
+      "targets": [{ "expr": "(sum(rate(ceph_osd_op_w_latency_sum[5m])) / sum(rate(ceph_osd_op_w_latency_count[5m]))) / 0.05", "legendFormat": "Index", "refId": "A" }]
     }
   ]
 }
