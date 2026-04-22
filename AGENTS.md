@@ -21,7 +21,7 @@ from git — no manual kubectl applies.
 | VMs | Vagrant + VirtualBox | Ubuntu 24.04, 4 nodes |
 | Kubernetes | k3s | 1.32 |
 | CNI + LB | Cilium | 1.18.2 |
-| Storage | Rook + Ceph Tentacle | v1.19.1 / v20.2.x |
+| Storage | Rook + Ceph Squid | v1.19.1 / v19.2.2 |
 | GitOps | ArgoCD | stable |
 | TLS | cert-manager | v1.14.5 |
 | Ingress | Gateway API (Cilium) | v1.4.1 |
