@@ -64,7 +64,7 @@ spec:
       osd_max_backfills: "1"
       osd_recovery_max_active: "1"
       osd_recovery_op_priority: "3"
-      osd_memory_target: "1073741824" # 1Gi — keep in sync with resource requests
+      osd_memory_target: "536870912" # 512Mi — keep in sync with resource requests
 
   # ── Ops safety ────────────────────────────────────────────────────────────
   crashCollector:
@@ -92,34 +92,34 @@ spec:
       storeType: bluestore
 
   # ── Resource requests ─────────────────────────────────────────────────────
-  # Tuned for 6 GB worker nodes — conservative so OSD workloads don't OOM.
-  # Bump requests if you see throttling under load.
+  # Tuned for 6 GB worker nodes. Lower requests allow scheduling on busy nodes,
+  # while limits provide headroom for burst.
   resources:
     mon:
       requests:
         cpu: "100m"
-        memory: "512Mi"
+        memory: "256Mi"
       limits:
         cpu: "1000m"
         memory: "1Gi"
     mgr:
       requests:
         cpu: "100m"
-        memory: "512Mi"
+        memory: "256Mi"
       limits:
         cpu: "1000m"
         memory: "1Gi"
     osd:
       requests:
         cpu: "250m"
-        memory: "1Gi"
+        memory: "512Mi"
       limits:
         cpu: "2000m"
         memory: "2Gi"
     mds:
       requests:
         cpu: "100m"
-        memory: "512Mi"
+        memory: "256Mi"
       limits:
         cpu: "1000m"
         memory: "1Gi"
