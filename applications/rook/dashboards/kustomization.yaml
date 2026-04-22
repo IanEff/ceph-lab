@@ -28,5 +28,12 @@ configMapGenerator:
       labels:
         grafana_dashboard: "1"
 
+  - name: grafana-dashboard-prototype-observability
+    files:
+      - prototype-observability.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+
 generatorOptions:
   disableNameSuffixHash: true
