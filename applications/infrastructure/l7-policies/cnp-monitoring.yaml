@@ -29,6 +29,9 @@ spec:
             dns:
               - matchPattern: "*"
     - toEntities: [ cluster, kube-apiserver ]
+      toPorts:
+        - ports:
+            - { port: "8080", protocol: TCP }
     - toEntities: [ world ]
       toPorts:
         - ports:

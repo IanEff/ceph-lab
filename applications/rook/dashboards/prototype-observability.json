@@ -4,7 +4,7 @@
   "tags": ["prototype", "slo", "ceph", "observability"],
   "timezone": "browser",
   "schemaVersion": 38,
-  "version": 2,
+  "version": 3,
   "refresh": "1m",
   "time": { "from": "now-3h", "to": "now" },
   "timepicker": {},
@@ -259,8 +259,8 @@
     {
       "type": "stat",
       "id": 14,
-      "title": "Read SLO Success Rate (Ops < 50ms)",
-      "description": "% of read operations meeting the 50ms latency target.",
+      "title": "Read SLO Success Rate (Ops < 100ms)",
+      "description": "% of read operations meeting the 100ms latency target (OSD hardware limit).",
       "gridPos": { "x": 8, "y": 31, "w": 8, "h": 4 },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
@@ -280,13 +280,13 @@
           }
         }
       },
-      "targets": [{ "expr": "sum(rate(ceph_native_osd_op_r_latency_seconds_bucket{le=\"0.05\"}[5m])) / sum(rate(ceph_native_osd_op_r_latency_seconds_count[5m]))", "legendFormat": "Success Rate", "refId": "A" }]
+      "targets": [{ "expr": "sum(rate(ceph_native_osd_op_r_latency_seconds_bucket{le=\"0.099999\"}[5m])) / sum(rate(ceph_native_osd_op_r_latency_seconds_count[5m]))", "legendFormat": "Success Rate", "refId": "A" }]
     },
     {
       "type": "stat",
       "id": 15,
-      "title": "Write SLO Success Rate (Ops < 50ms)",
-      "description": "% of write operations meeting the 50ms latency target.",
+      "title": "Write SLO Success Rate (Ops < 100ms)",
+      "description": "% of write operations meeting the 100ms latency target (OSD hardware limit).",
       "gridPos": { "x": 16, "y": 31, "w": 8, "h": 4 },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
@@ -306,7 +306,7 @@
           }
         }
       },
-      "targets": [{ "expr": "sum(rate(ceph_native_osd_op_w_latency_seconds_bucket{le=\"0.05\"}[5m])) / sum(rate(ceph_native_osd_op_w_latency_seconds_count[5m]))", "legendFormat": "Success Rate", "refId": "A" }]
+      "targets": [{ "expr": "sum(rate(ceph_native_osd_op_w_latency_seconds_bucket{le=\"0.099999\"}[5m])) / sum(rate(ceph_native_osd_op_w_latency_seconds_count[5m]))", "legendFormat": "Success Rate", "refId": "A" }]
     },
     {
       "type": "stat",

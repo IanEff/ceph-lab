@@ -108,3 +108,12 @@ serverFiles:
         relabel_configs:
           - target_label: job
             replacement: hubble
+
+      # Ceph Latency Bridge (Native Histogram Reconstruction).
+      - job_name: "ceph-latency-bridge"
+        static_configs:
+          - targets:
+              - "ceph-latency-bridge.rook-ceph.svc.cluster.local:8080"
+        relabel_configs:
+          - target_label: job
+            replacement: ceph-latency-bridge
