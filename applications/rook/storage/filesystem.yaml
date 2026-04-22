@@ -24,10 +24,10 @@ spec:
     resources:
       requests:
         cpu: "100m"
-        memory: "256Mi"
+        memory: "512Mi"
       limits:
         cpu: "1000m"
-        memory: "512Mi"
+        memory: "1Gi"
 ---
 # Required since Rook v1.17 — CSI does not auto-create the default subvolume group.
 apiVersion: ceph.rook.io/v1
