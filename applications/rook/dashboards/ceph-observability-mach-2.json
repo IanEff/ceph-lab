@@ -225,7 +225,7 @@
           }
         }
       },
-      "targets": [{ "expr": "1 - ((1 - (sum(rate(ceph_native_osd_op_r_latency_seconds_bucket{le=\"0.1\"}[30d])) / sum(rate(ceph_native_osd_op_r_latency_seconds_count[30d])))) / 0.001)", "legendFormat": "Budget Remaining", "refId": "A" }]
+      "targets": [{ "expr": "1 - ((1 - (sum(rate(ceph_native_osd_op_r_latency_seconds_bucket{le=\"0.099999\"}[30d])) / sum(rate(ceph_native_osd_op_r_latency_seconds_count[30d])))) / 0.001)", "legendFormat": "Budget Remaining", "refId": "A" }]
     },
     {
       "type": "stat",
@@ -250,7 +250,7 @@
           }
         }
       },
-      "targets": [{ "expr": "((sum(rate(ceph_native_osd_op_r_latency_seconds_count[1h])) - sum(rate(ceph_native_osd_op_r_latency_seconds_bucket{le=\"0.1\"}[1h]))) / sum(rate(ceph_native_osd_op_r_latency_seconds_count[1h]))) / 0.001", "legendFormat": "Burn Rate (1h)", "refId": "A" }]
+      "targets": [{ "expr": "((sum(rate(ceph_native_osd_op_r_latency_seconds_count[1h])) - sum(rate(ceph_native_osd_op_r_latency_seconds_bucket{le=\"0.099999\"}[1h]))) / sum(rate(ceph_native_osd_op_r_latency_seconds_count[1h]))) / 0.001", "legendFormat": "Burn Rate (1h)", "refId": "A" }]
     },
     {
       "type": "stat",
@@ -275,7 +275,7 @@
           }
         }
       },
-      "targets": [{ "expr": "((sum(rate(ceph_native_osd_op_r_latency_seconds_count[6h])) - sum(rate(ceph_native_osd_op_r_latency_seconds_bucket{le=\"0.1\"}[6h]))) / sum(rate(ceph_native_osd_op_r_latency_seconds_count[6h]))) / 0.001", "legendFormat": "Burn Rate (6h)", "refId": "A" }]
+      "targets": [{ "expr": "((sum(rate(ceph_native_osd_op_r_latency_seconds_count[6h])) - sum(rate(ceph_native_osd_op_r_latency_seconds_bucket{le=\"0.099999\"}[6h]))) / sum(rate(ceph_native_osd_op_r_latency_seconds_count[6h]))) / 0.001", "legendFormat": "Burn Rate (6h)", "refId": "A" }]
     }
   ]
 }
