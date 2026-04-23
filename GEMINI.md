@@ -80,10 +80,11 @@ This project contains custom Gemini CLI skills in `.github/skills/`. For GitOps 
 4. **`CephFilesystemSubVolumeGroup` is required** (Rook ≥ v1.17) — without it, CephFS dynamic provisioning silently fails.
 5. **ArgoCD runs insecure** — TLS is disabled. Cilium Gateway runs HTTP-only (port 80). Service URLs work at http://*.ceph.lab.
 6. **L7 Policies (CNP) are in effect** — Cilium Network Policies in `applications/infrastructure/l7-policies/` enforce strict network isolation. If a new component needs to communicate externally or across namespaces, ensure appropriate policies exist. **Crucial**: Egress to the Kubernetes API server (port 443) must be explicitly allowed for components that need to query the API (like `kube-state-metrics`).
-7. **OSD Performance Histograms are coarse** — Ceph Squid OSD histograms have a minimum granularity of 100ms. SLOs requiring higher resolution (e.g., 50ms) cannot be tracked via the `ceph-latency-bridge` and should use CSI metrics instead.
+7. **OSD Performance Histograms precision** — Ceph OSD histograms (via `ceph-latency-bridge`) export bucket boundaries with high floating-point precision (e.g., `le="0.099999"` instead of `0.1`). PromQL queries in dashboards and rules MUST match these exact labels.
 8. **Resource Limits in Monitoring** — Prometheus-related components (especially `kube-state-metrics` and `prometheus-server`) are resource-heavy in this lab environment. If they enter `CrashLoopBackOff`, check memory limits first; `kube-state-metrics` needs at least 256Mi and `prometheus-server` needs 1Gi to handle substantial dashboards.
 9. **ArgoCD Sync Loops during Debugging** — When performing emergency manual fixes via `kubectl patch/apply`, ArgoCD's `selfHeal` will often immediately revert them. To stop this loop, disable sync on the **root app** (`ceph-lab-root`) first, then the specific Application, then perform your fix. Don't forget to re-enable them after pushing to Git.
 10. **Histogram Bucket Ordering** — Custom Prometheus exporters (like `ceph-latency-bridge`) MUST export histogram buckets in strictly ascending `le` order with `+Inf` at the end. Out-of-order buckets will cause Prometheus to discard the metrics.
+11. **Definitive Observability Dashboard** — `ceph-observability-mach-2.json` (in `applications/rook/dashboards/`) is the definitive reference for the 3-row narrative (Health, SLI, SLO). It uses reconstructed native histograms for true P99 tail latency and implements burn-rate alerting.
 
 
 ---
