@@ -145,9 +145,9 @@
           "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.1 }] }
         }
       },
-      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(ceph_native_osd_op_w_latency_seconds_bucket[5m])) by (le))", "legendFormat": "Write P99", "refId": "A" }]
-    },
-    {
+      "targets": [{ "expr": "histogram_quantile(0.99, sum by (le, osd) (rate(ceph_osd_op_w_latency_bucket[5m])))", "legendFormat": "{{osd}}", "refId": "A" }]
+      },
+      {
       "type": "timeseries",
       "id": 6,
       "title": "OSD Read Latency P99",
@@ -161,8 +161,9 @@
           "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.1 }] }
         }
       },
-      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(ceph_native_osd_op_r_latency_seconds_bucket[5m])) by (le))", "legendFormat": "Read P99", "refId": "A" }]
-    },
+      "targets": [{ "expr": "histogram_quantile(0.99, sum by (le, osd) (rate(ceph_osd_op_r_latency_bucket[5m])))", "legendFormat": "{{osd}}", "refId": "A" }]
+      }
+,
     {
       "type": "timeseries",
       "id": 7,
