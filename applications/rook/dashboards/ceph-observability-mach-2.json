@@ -12,7 +12,7 @@
     {
       "type": "row",
       "id": 100,
-      "title": "Row 1: \"Is the cluster healthy right now?\" — the overview they don't have",
+      "title": "Row 1: \"Is the cluster healthy right now?\" — the overview",
       "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }
     },
     {
