@@ -41,8 +41,11 @@ uv run provisioning/scripts/manage_k8s_config.py remove && vagrant destroy -f
 applications/
   config/             # gitops.env — single source of truth for all IPs, versions, hostnames
   infrastructure/     # one dir per infra component; each has config.json + kustomization.yaml
+    ceph-latency-bridge/  # native OSD histogram reconstruction (wave 30)
+    elk-slo-dashboard/    # Ceph OSD SLO alerts and dashboard (wave 32)
   clusters/ceph-lab/  # ApplicationSet (infra-set.yaml) + per-wave Rook Applications
   rook/               # Kustomize bases: operator, cluster, storage, gateway
+    dashboards/       # Grafana dashboard JSONs loaded as ConfigMaps (wave 31)
 cluster-bootstrap/
   argocd/             # ArgoCD install patches (insecure mode, --enable-helm, resource limits)
   bootstrap/          # root-app.yaml — the seed Application that ArgoCD self-manages
@@ -104,7 +107,9 @@ All policies live in `applications/infrastructure/l7-policies/`. One policy per 
 | 20 | rook-operator | **false** | true |
 | 25 | rook-cluster | **false** | **false** |
 | 30 | rook-storage | true | true |
+| 30 | ceph-latency-bridge (SLO metrics) | true | true |
 | 31 | rook-dashboards (Grafana ConfigMaps) | true | true |
+| 32 | elk-slo-dashboard (Ceph OSD SLO) | true | true |
 | 35 | rook-gateway | true | true |
 
 Rook operator and rook-cluster prune/selfHeal settings are intentional — they protect Ceph data from accidental ArgoCD deletes.
@@ -123,6 +128,10 @@ Rook operator and rook-cluster prune/selfHeal settings are intentional — they 
 8. **k3s uses SQLite, not etcd** — `kubeEtcd` scraper is disabled in Prometheus values.
 9. **Gateway API CRDs must precede Cilium** — wave `-15` mirrors `install_cilium.sh` which applies CRDs first with `kubectl wait`.
 10. **`--enable-helm` is required** — patched into `argocd-cm` via `cluster-bootstrap/argocd/kustomization.yaml`. Without it, `helmCharts:` stanzas are silently ignored.
+11. **OSD histogram `le` labels use high floating-point precision** — `ceph-latency-bridge` exports bucket boundaries like `le="0.099999"` not `le="0.1"`. PromQL queries in dashboards and recording rules must match these exact labels or return no data.
+12. **Histogram buckets must be in strictly ascending order** — custom exporters (like `ceph-latency-bridge`) must emit `le` values ascending with `+Inf` last. Out-of-order buckets cause Prometheus to silently discard the metric.
+13. **`ceph-observability-mach-2.json` is the definitive SLO dashboard** — 3-row narrative: Health → SLI → SLO. Uses per-OSD P99 lines and burn-rate alerting. Located in `applications/rook/dashboards/`.
+14. **Disabling ArgoCD selfHeal during manual fixes** — `selfHeal: true` will immediately revert `kubectl patch/apply` changes. Disable sync on `ceph-lab-root` first, then the specific Application, apply the fix, then push to git and re-enable.
 
 ---
 

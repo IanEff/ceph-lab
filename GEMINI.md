@@ -63,6 +63,7 @@ The `infrastructure-set` ApplicationSet auto-discovers it. No other file needs e
 | 31 | rook-dashboards (Grafana CMs) | true | true |
 | 32 | elk-slo-dashboard (Ceph OSD SLO) | true | true |
 | 35 | rook-gateway (routes) | true | true |
+| 40 | s3-traffic-generator | true | true |
 
 ### 5. Helm is always via Kustomize
 ArgoCD uses `--enable-helm` in `kustomize.buildOptions`. Use `helmCharts:` in `kustomization.yaml` or a wrapper chart.
@@ -79,13 +80,37 @@ This project contains custom Gemini CLI skills in `.github/skills/`. For GitOps 
 3. **Gateway API manifests must include API-defaulted fields** — See `docs/gitops-argocd-lessons.md` §3. Omitting them causes permanent ArgoCD OutOfSync loops.
 4. **`CephFilesystemSubVolumeGroup` is required** (Rook ≥ v1.17) — without it, CephFS dynamic provisioning silently fails.
 5. **ArgoCD runs insecure** — TLS is disabled. Cilium Gateway runs HTTP-only (port 80). Service URLs work at http://*.ceph.lab.
-6. **L7 Policies (CNP) are in effect** — Cilium Network Policies in `applications/infrastructure/l7-policies/` enforce strict network isolation. If a new component needs to communicate externally or across namespaces, ensure appropriate policies exist. **Crucial**: Egress to the Kubernetes API server (port 443) must be explicitly allowed for components that need to query the API (like `kube-state-metrics`).
+6. **L7 Policies (CNP) are in effect** — Cilium Network Policies in `applications/infrastructure/l7-policies/` enforce strict network isolation. **Crucial**: Egress to the Kubernetes API server (`kube-apiserver`) must be explicitly allowed for components that need to query the API (like `kube-state-metrics`). The `l7-visibility` policy in the `monitoring` namespace handles this via `toEntities: [ cluster, kube-apiserver ]`.
 7. **OSD Performance Histograms precision** — Ceph OSD histograms (via `ceph-latency-bridge`) export bucket boundaries with high floating-point precision (e.g., `le="0.099999"` instead of `0.1`). PromQL queries in dashboards and rules MUST match these exact labels.
 8. **Resource Limits in Monitoring** — Prometheus-related components (especially `kube-state-metrics` and `prometheus-server`) are resource-heavy in this lab environment. If they enter `CrashLoopBackOff`, check memory limits first; `kube-state-metrics` needs at least 256Mi and `prometheus-server` needs 1Gi to handle substantial dashboards.
 9. **ArgoCD Sync Loops during Debugging** — When performing emergency manual fixes via `kubectl patch/apply`, ArgoCD's `selfHeal` will often immediately revert them. To stop this loop, disable sync on the **root app** (`ceph-lab-root`) first, then the specific Application, then perform your fix. Don't forget to re-enable them after pushing to Git.
 10. **Histogram Bucket Ordering** — Custom Prometheus exporters (like `ceph-latency-bridge`) MUST export histogram buckets in strictly ascending `le` order with `+Inf` at the end. Out-of-order buckets will cause Prometheus to discard the metrics.
-11. **Definitive Observability Dashboard** — `ceph-observability-mach-2.json` (in `applications/rook/dashboards/`) is the definitive reference for the 3-row narrative (Health, SLI, SLO). It uses reconstructed native histograms for true P99 tail latency and implements burn-rate alerting.
+11. **Definitive Observability Dashboard** — `ceph-observability-mach-2.json` (in `applications/rook/dashboards/`) is the definitive reference for the 3-row narrative (Health → SLI → SLO). It uses per-OSD P99 lines for granular latency tracking and implements burn-rate alerting.
 
+---
+
+## Cluster topology
+
+| Node | IP | Role |
+|---|---|---|
+| `ceph-control` | `192.168.56.50` | k3s server, 2 vCPU / 3 GB |
+| `ceph-node-{1,2,3}` | `192.168.56.{61,62,63}` | k3s agents + Ceph OSDs, 3 vCPU / 6 GB + 2×10 GB raw OSDs |
+| Cilium Gateway | `192.168.56.200` | L2 LB (pool `192.168.56.192/27`) |
+
+DNS: `*.ceph.lab → 192.168.56.200` via macOS dnsmasq.
+
+---
+
+## Service URLs
+
+| Service | URL |
+|---|---|
+| ArgoCD | http://argocd.ceph.lab |
+| Grafana | http://grafana.ceph.lab |
+| Ceph Dashboard | http://dashboard.ceph.lab |
+| Hubble UI | http://hubble.ceph.lab |
+| Prometheus | http://prometheus.ceph.lab |
+| S3 (objectstore) | http://s3.ceph.lab |
 
 ---
 
@@ -96,6 +121,8 @@ This project contains custom Gemini CLI skills in `.github/skills/`. For GitOps 
 applications/
   config/           # gitops.env (single source of truth) + Kustomize Component
   infrastructure/   # One dir per infra component:
+    argocd-ingress/ # Ingress for ArgoCD UI
+    gateway-api/    # Infrastructure for Gateway API (CRDs)
     prometheus/     # Time-series database
     grafana/        # Dashboards & Visualization
     prometheus-operator-crds/ # Foundation for monitoring CRDs
@@ -103,6 +130,7 @@ applications/
     l7-policies/    # Network security policies
     elk-slo-dashboard/ # Ceph OSD SLO alerts and dashboard
     ceph-latency-bridge/ # Native OSD histogram reconstruction
+    s3-traffic-generator/ # Load generator for RGW
   clusters/ceph-lab/ # ApplicationSet (infra-set.yaml) + per-wave Rook Applications
   rook/             # Kustomize bases for rook-operator, cluster, storage, gateway, and dashboards
 cluster-bootstrap/
