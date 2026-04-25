@@ -2,17 +2,25 @@
 # ceph-lab — install_argocd.sh
 # Bootstraps ArgoCD and seeds the root Application that drives GitOps.
 #
-# Requires (from .env / Vagrantfile):
+# Requires (from .env / provision.env):
 #   GITOPS_REPO_URL       — full URL of this repo (SSH or HTTPS)
 #   GITOPS_REPO_TOKEN     — GitHub token for HTTPS access  (leave empty for SSH)
-#   GITOPS_SSH_KEY_PATH   — host path to SSH private key   (leave empty for HTTPS)
+#   GITOPS_SSH_KEY_PATH   — relative path to SSH private key (leave empty for HTTPS)
 #   ARGOCD_VERSION        — "stable" or "v2.14.0" etc.
 #
 # Run from inside ceph-control VM:
-#   bash /vagrant/provisioning/scripts/install_argocd.sh
+#   bash /ceph-lab/provisioning/scripts/install_argocd.sh
 set -euo pipefail
 
 export KUBECONFIG=/root/.kube/config
+
+# Load cluster config (secrets from .env, topology from provision.env)
+set -a
+# shellcheck disable=SC1091
+source /ceph-lab/provisioning/provision.env
+# shellcheck disable=SC1091
+[ -f /ceph-lab/.env ] && source /ceph-lab/.env
+set +a
 
 GITOPS_REPO_URL="${GITOPS_REPO_URL:-}"
 GITOPS_REPO_TOKEN="${GITOPS_REPO_TOKEN:-}"
@@ -21,9 +29,9 @@ ARGOCD_VERSION="${ARGOCD_VERSION:-stable}"
 
 # Auto-detect the deploy key when it exists at the conventional location
 # and no SSH key path was explicitly configured.
-if [ -z "$GITOPS_SSH_KEY_PATH" ] && [ -f "/vagrant/deploy_ceph-lab" ]; then
+if [ -z "$GITOPS_SSH_KEY_PATH" ] && [ -f "/ceph-lab/deploy_ceph-lab" ]; then
     GITOPS_SSH_KEY_PATH="deploy_ceph-lab"
-    echo "  Auto-detected deploy key at /vagrant/deploy_ceph-lab"
+    echo "  Auto-detected deploy key at /ceph-lab/deploy_ceph-lab"
 fi
 
 if [ -z "$GITOPS_REPO_URL" ]; then
@@ -39,7 +47,7 @@ echo "════════════════════════�
 
 echo "[0] Pre-bootstrap Cilium Gateway resources (LBIPPool, L2Policy, Gateway, HTTPRoutes)"
 echo "    This makes 192.168.56.200 reachable before ArgoCD reconciles wave -10."
-CILIUM_APP=/vagrant/applications/infrastructure/cilium
+CILIUM_APP=/ceph-lab/applications/infrastructure/cilium
 bootstrap_ok=0
 for attempt in $(seq 1 8); do
     echo "[0] Building and applying Cilium kustomization (attempt ${attempt}/8)..."
@@ -61,7 +69,7 @@ else
 fi
 
 echo "[0] Waiting for Gateway to acquire LB IP (up to 120s)..."
-for i in $(seq 1 12); do
+for _i in $(seq 1 12); do
     GW_IP=$(kubectl get gateway cilium-gateway -n kube-system \
         -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || true)
     if [ -n "$GW_IP" ]; then
@@ -77,15 +85,16 @@ kubectl apply --server-side -n argocd -f \
     "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
 
 echo "[2] Apply local bootstrap patches (insecure mode, kustomize-helm, bcrypt password)"
-kubectl apply --server-side -k /vagrant/cluster-bootstrap/argocd/
+kubectl apply --server-side -k /ceph-lab/cluster-bootstrap/argocd/
 
 echo "[3] Wait for ArgoCD server to be ready..."
 kubectl rollout status deployment/argocd-server -n argocd --timeout=5m
 
 echo "[4] Configure repository access"
-if [ -n "$GITOPS_SSH_KEY_PATH" ] && [ -f "/vagrant/${GITOPS_SSH_KEY_PATH}" ]; then
+if [ -n "$GITOPS_SSH_KEY_PATH" ] && [ -f "/ceph-lab/${GITOPS_SSH_KEY_PATH}" ]; then
     echo "  Using SSH deploy key: ${GITOPS_SSH_KEY_PATH}"
-    SSH_KEY=$(cat "/vagrant/${GITOPS_SSH_KEY_PATH}")
+    # Indent each line of the key for the YAML literal block scalar
+    SSH_KEY_INDENTED=$(awk '{print "    " $0}' "/ceph-lab/${GITOPS_SSH_KEY_PATH}")
     kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Secret
@@ -100,7 +109,7 @@ stringData:
   url: "${GITOPS_REPO_URL}"
   insecureIgnoreHostKey: "true"
   sshPrivateKey: |
-$(echo "$SSH_KEY" | sed 's/^/    /')
+${SSH_KEY_INDENTED}
 EOF
 elif [ -n "$GITOPS_REPO_TOKEN" ]; then
     echo "  Using HTTPS token"
@@ -129,13 +138,12 @@ echo "[5] Substitute GITOPS_REPO_URL placeholder across all manifests"
 # All Application / ApplicationSet YAMLs under applications/clusters/ and
 # cluster-bootstrap/ contain the literal string GITOPS_REPO_URL.  Replace it
 # in-place so ArgoCD can resolve the correct repository when it reads them.
-# We exclude .git/ and node_modules if present, and work only on YAML files.
-find /vagrant/applications/clusters /vagrant/cluster-bootstrap \
+find /ceph-lab/applications/clusters /ceph-lab/cluster-bootstrap \
     -type f -name "*.yaml" \
     -exec sed -i "s|GITOPS_REPO_URL|${GITOPS_REPO_URL}|g" {} +
 
 echo "[5b] Apply root Application (seeds entire GitOps tree)"
-kubectl apply -f /vagrant/cluster-bootstrap/bootstrap/root-app.yaml
+kubectl apply -f /ceph-lab/cluster-bootstrap/bootstrap/root-app.yaml
 
 echo "[6] Install argocd CLI"
 ARGOCD_CLI_VERSION=$(curl -sL \

@@ -8,6 +8,12 @@ K3S_CHANNEL="${SANDBOX_K3S_CHANNEL:-v1.32}"
 CILIUM_VERSION="${CILIUM_VERSION:-1.18.2}"
 GATEWAY_API_VERSION="${GATEWAY_API_VERSION:-v1.4.1}"
 
+# Lima provision steps run as root directly; SUDO_USER is never set.
+# Source Lima's cidata env for the authoritative interactive user identity.
+# shellcheck disable=SC1091
+[ -f /mnt/lima-cidata/lima.env ] && source /mnt/lima-cidata/lima.env
+LAB_USER="${LIMA_CIDATA_USER:-}"
+
 echo "══════════════════════════════════════════"
 echo "  ceph-lab — control-plane setup           "
 echo "══════════════════════════════════════════"
@@ -58,21 +64,29 @@ until kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get nodes &>/dev/null; do
     sleep 3
 done
 
-echo "[6] Set up kubeconfig for root + vagrant"
+echo "[6] Set up kubeconfig for root + ${LAB_USER}"
 mkdir -p /root/.kube
 cp /etc/rancher/k3s/k3s.yaml /root/.kube/config
 sed -i "s/127\.0\.0\.1/${CONTROL_PLANE_IP}/g" /root/.kube/config
 
-mkdir -p /home/vagrant/.kube
-cp /etc/rancher/k3s/k3s.yaml /home/vagrant/.kube/config
-sed -i "s/127\.0\.0\.1/${CONTROL_PLANE_IP}/g" /home/vagrant/.kube/config
-chown -R vagrant:vagrant /home/vagrant/.kube
+LAB_USER_HOME="${LIMA_CIDATA_HOME:-}"
+if [ -n "${LAB_USER_HOME}" ]; then
+    mkdir -p "${LAB_USER_HOME}/.kube"
+    cp /etc/rancher/k3s/k3s.yaml "${LAB_USER_HOME}/.kube/config"
+    sed -i "s/127\.0\.0\.1/${CONTROL_PLANE_IP}/g" "${LAB_USER_HOME}/.kube/config"
+    chown -R "${LAB_USER}:${LAB_USER}" "${LAB_USER_HOME}/.kube"
+fi
+
+echo "[6b] Wait for API server at ${CONTROL_PLANE_IP}:6443 (k3s may briefly restart during init)"
+until kubectl --kubeconfig /root/.kube/config get nodes &>/dev/null; do
+    sleep 3
+done
 
 echo "[7] Install Cilium CNI"
-bash /vagrant/provisioning/scripts/install_cilium.sh
+bash /ceph-lab/provisioning/scripts/install_cilium.sh
 
 echo "[8] Publish join token for worker nodes"
 until [ -f /var/lib/rancher/k3s/server/node-token ]; do sleep 1; done
-install -m 644 /var/lib/rancher/k3s/server/node-token /vagrant/node-token
+install -m 644 /var/lib/rancher/k3s/server/node-token /ceph-lab/provisioning/node-token
 
 echo "✓ control-plane.sh complete — workers can now join"

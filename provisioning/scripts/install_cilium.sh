@@ -37,7 +37,7 @@ helm upgrade --install cilium cilium/cilium \
     --set ipv4NativeRoutingCIDR="10.244.0.0/16" \
     --set bpf.masquerade=true \
     --set datapathMode=netkit \
-    --set "devices=enp+" \
+    --set "devices=eth+" \
     --set operator.replicas=1 \
     --set gatewayAPI.enabled=true \
     --set l2announcements.enabled=true \

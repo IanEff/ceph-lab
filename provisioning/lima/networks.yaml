@@ -1,0 +1,24 @@
+# Lima user network — ceph-lab (192.168.56.0/24)
+#
+# This file is installed by `make setup` (provisioning/lima-setup.sh) into
+# ~/.lima/_config/networks.yaml.  It defines the host-only L2 segment that
+# gives every VM a static, directly-routable IP on the Mac without NAT.
+#
+# Prerequisites:
+#   socket_vmnet installed and sudoers regenerated  (see lima-setup.sh)
+#   Lima 2.x  (vmType: vz + socket_vmnet support)
+#
+# IP allocation:
+#   .1          gateway (socket_vmnet)
+#   .1 – .190   DHCP range (Lima-managed; not used — VMs take static IPs)
+#   .50         ceph-control  (static, via netplan in VM)
+#   .61 – .63   ceph-node-{1,2,3}  (static, via netplan in VM)
+#   .192/27     Cilium L2 LB pool (reserved; socket_vmnet won't assign these)
+
+networks:
+  ceph-lab:
+    mode: host
+    gateway: 192.168.56.1
+    dhcpEnd: 192.168.56.190
+    netmask: 255.255.255.0
+    interface: lima-ceph-lab
