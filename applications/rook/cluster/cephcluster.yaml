@@ -85,9 +85,9 @@ spec:
   storage:
     useAllNodes: true
     useAllDevices: false
-    # Targets /dev/sdc and /dev/sdd on each worker node.
-    # /dev/sdb is the k3s data disk and must NOT be touched.
-    deviceFilter: "^sd[cd]"
+    # Targets /dev/vdc and /dev/vdd on each worker node (Lima virtio-blk).
+    # /dev/vdb is the k3s data disk and must NOT be touched.
+    deviceFilter: "^vd[cd]"
     config:
       storeType: bluestore
 

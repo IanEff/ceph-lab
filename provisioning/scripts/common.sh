@@ -1,12 +1,20 @@
 #!/bin/bash
 # ceph-lab — common.sh
-# Runs on every node (control plane + workers) during vagrant up.
-# Sets up kernel modules, sysctl, swap, OSD disks, base packages, and shell ergonomics.
+# Runs on every node (control plane + workers) during cluster provisioning.
+# Sets up kernel modules, sysctl, swap, base packages, and shell ergonomics.
 set -e
 
 echo "══════════════════════════════════════════"
 echo "  ceph-lab provisioning — common baseline  "
 echo "══════════════════════════════════════════"
+
+# Lima provision steps run as root directly; SUDO_USER is never set.
+# Source Lima's cidata env — LIMA_CIDATA_USER and LIMA_CIDATA_HOME are always
+# set and authoritative (the Mac user's UID maps to Lima, not necessarily 1000).
+# shellcheck disable=SC1091
+[ -f /mnt/lima-cidata/lima.env ] && source /mnt/lima-cidata/lima.env
+LAB_USER="${LIMA_CIDATA_USER:-}"
+USER_HOME="${LIMA_CIDATA_HOME:-}"
 
 echo "[1] Disable swap"
 swapoff -a
@@ -42,15 +50,21 @@ EOF
 sysctl --system >/dev/null
 
 echo "[5] /etc/hosts — cluster node entries"
+CONTROL_PLANE_IP="${SANDBOX_CONTROL_PLANE_IP:-192.168.56.50}"
+NODE_IP_BASE="${SANDBOX_CEPH_NODE_IP_BASE:-60}"
+NUM_NODES="${SANDBOX_NUM_CEPH_NODES:-3}"
 cat >> /etc/hosts <<EOF
-192.168.56.50 ceph-control
-192.168.56.61 ceph-node-1
-192.168.56.62 ceph-node-2
-192.168.56.63 ceph-node-3
+${CONTROL_PLANE_IP} ceph-control
 EOF
+for i in $(seq 1 "${NUM_NODES}"); do
+    NODE_IP="192.168.56.$((NODE_IP_BASE + i))"
+    echo "${NODE_IP} ceph-node-${i}" >> /etc/hosts
+done
 
 echo "[6] Mount secondary disk → /var/lib/rancher (k3s data dir)"
-TARGET_DISK="/dev/sdb"
+# Lima virtio-blk: /dev/vdb is the pre-created secondary disk for k3s data.
+# /dev/vdc and /dev/vdd are raw OSD disks — leave them unformatted for Rook.
+TARGET_DISK="/dev/vdb"
 if [ -b "$TARGET_DISK" ]; then
     if grep -qs "$TARGET_DISK" /proc/mounts; then
         echo "  $TARGET_DISK already mounted."
@@ -64,7 +78,7 @@ if [ -b "$TARGET_DISK" ]; then
             echo "$TARGET_DISK /var/lib/rancher ext4 defaults 0 0" >> /etc/fstab
     fi
 fi
-echo "  OSD disks (sdc+) left raw — Rook claims them automatically."
+echo "  OSD disks (vdc+) left raw — Rook claims them automatically."
 
 echo "[7] Robust APT settings"
 apt-get update
@@ -87,8 +101,8 @@ systemctl enable --now iscsid
 echo "[9] Shell ergonomics — fish, bash, vim, tmux"
 
 # ── fish config ────────────────────────────────────────────────────────────────
-mkdir -p /home/vagrant/.config/fish/conf.d
-cat > /home/vagrant/.config/fish/conf.d/ceph-lab.fish <<'FISH'
+mkdir -p "${USER_HOME}/.config/fish/conf.d"
+cat > "${USER_HOME}/.config/fish/conf.d/ceph-lab.fish" <<'FISH'
 # ── Ceph / Rook diagnostics ──────────────────────────────────────────────────
 abbr -a ceph-status    'kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph status'
 abbr -a ceph-df        'kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph df detail'
@@ -120,14 +134,14 @@ abbr -a hubble-drops   'hubble observe --verdict DROPPED'
 abbr -a hubble-ceph    'hubble observe --namespace rook-ceph --type l7'
 
 # ── Lab helpers ───────────────────────────────────────────────────────────────
-abbr -a open-urls      'bash /vagrant/provisioning/scripts/open_urls.sh'
+abbr -a open-urls      'bash /ceph-lab/provisioning/scripts/open_urls.sh'
 abbr -a get-pass       'kubectl -n rook-ceph get secret rook-ceph-dashboard-password -o jsonpath="{.data.password}" | base64 -d; echo'
 FISH
 
-chown -R vagrant:vagrant /home/vagrant/.config
+chown -R "${LAB_USER}:${LAB_USER}" "${USER_HOME}/.config"
 
 # ── bash aliases ──────────────────────────────────────────────────────────────
-cat >> /home/vagrant/.bashrc <<'BASH'
+cat >> "${USER_HOME}/.bashrc" <<'BASH'
 
 # ── ceph-lab convenience aliases ────────────────────────────────────────────
 _toolbox() { kubectl exec -n rook-ceph deploy/rook-ceph-tools -- "$@"; }
@@ -149,7 +163,7 @@ alias kpa='kubectl get pods -A'
 alias argo-apps='kubectl get applications -n argocd'
 alias hubble-rook='hubble observe --namespace rook-ceph'
 alias hubble-drops='hubble observe --verdict DROPPED'
-alias open-urls='bash /vagrant/provisioning/scripts/open_urls.sh'
+alias open-urls='bash /ceph-lab/provisioning/scripts/open_urls.sh'
 alias get-pass='kubectl -n rook-ceph get secret rook-ceph-dashboard-password -o jsonpath="{.data.password}" | base64 -d; echo'
 
 # git branch + k8s context in prompt
@@ -159,7 +173,7 @@ export PROMPT_COMMAND='PS1="\[\e[1;36m\]k8s:\[\e[0m\]$(__ps1_k8s)\[\e[1;33m\]$(_
 BASH
 
 # ── vim defaults ──────────────────────────────────────────────────────────────
-cat > /home/vagrant/.vimrc <<'VIM'
+cat > "${USER_HOME}/.vimrc" <<'VIM'
 syntax on
 set number relativenumber
 set tabstop=2 shiftwidth=2 expandtab
@@ -170,7 +184,7 @@ colorscheme desert
 VIM
 
 # ── tmux config ───────────────────────────────────────────────────────────────
-cat > /home/vagrant/.tmux.conf <<'TMUX'
+cat > "${USER_HOME}/.tmux.conf" <<'TMUX'
 set -g mouse on
 set -g default-terminal "screen-256color"
 set -g status-style "bg=colour235,fg=colour136"
@@ -182,38 +196,9 @@ bind - split-window -v -c "#{pane_current_path}"
 bind r source-file ~/.tmux.conf \; display "tmux.conf reloaded"
 TMUX
 
-chown vagrant:vagrant /home/vagrant/.vimrc /home/vagrant/.tmux.conf /home/vagrant/.bashrc
-
-echo "[10] VirtualBox Guest Additions + /vagrant shared folder"
-# Check for vboxsf (shared folder FS module), NOT vboxguest (kernel driver).
-# cloud-image/ubuntu-24.04 ships with vboxguest pre-loaded, but vboxsf
-# requires Guest Additions to be built from the ISO.
-if ! lsmod | grep -q vboxsf 2>/dev/null; then
-    apt-get install -y build-essential linux-headers-"$(uname -r)" dkms
-    VBOX_ISO="/tmp/VBoxGuestAdditions.iso"
-    wget -q "https://download.virtualbox.org/virtualbox/7.2.4/VBoxGuestAdditions_7.2.4.iso" \
-        -O "$VBOX_ISO"
-    mkdir -p /mnt/vbox-iso
-    mount -o loop "$VBOX_ISO" /mnt/vbox-iso
-    ARCH=$(uname -m)
-    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-        /mnt/vbox-iso/VBoxLinuxAdditions-arm64.run --nox11 || true
-    else
-        /mnt/vbox-iso/VBoxLinuxAdditions.run --nox11 || true
-    fi
-    umount /mnt/vbox-iso
-    rm -rf /mnt/vbox-iso "$VBOX_ISO"
-    modprobe vboxsf || echo "[WARN] vboxsf still not available after GA install"
-fi
-
-# Always ensure /vagrant is mounted.
-if ! mountpoint -q /vagrant 2>/dev/null; then
-    mkdir -p /vagrant
-    modprobe vboxsf 2>/dev/null || true
-    mount -t vboxsf vagrant /vagrant || echo "[WARN] /vagrant mount failed — shared folder unavailable"
-fi
-grep -q 'vboxsf' /etc/modules 2>/dev/null || echo "vboxsf" >> /etc/modules
-grep -q 'vagrant.*vboxsf' /etc/fstab || \
-    echo "vagrant /vagrant vboxsf defaults,uid=1000,gid=1000 0 0" >> /etc/fstab
+chown "${LAB_USER}:${LAB_USER}" \
+    "${USER_HOME}/.vimrc" \
+    "${USER_HOME}/.tmux.conf" \
+    "${USER_HOME}/.bashrc"
 
 echo "✓ common.sh complete"
