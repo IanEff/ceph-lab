@@ -23,6 +23,10 @@ l2announcements:
 gatewayAPI:
   enabled: true
 
+ipam:
+  operator:
+    clusterPoolIPv4PodCIDRList: ["10.244.0.0/16"]
+
 operator:
   replicas: 1
   dashboards:

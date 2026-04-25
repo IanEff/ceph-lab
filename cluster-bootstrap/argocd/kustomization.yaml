@@ -103,3 +103,14 @@ patches:
                   matchExpressions:
                     - key: node-role.kubernetes.io/control-plane
                       operator: DoesNotExist
+
+  # This cluster is wide-open by design — L4/L7 control lives at the Cilium
+  # Gateway (HTTPRoute/GRPCRoute), not intra-cluster NetworkPolicy.
+  - target:
+      kind: NetworkPolicy
+    patch: |
+      $patch: delete
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata:
+        name: placeholder
