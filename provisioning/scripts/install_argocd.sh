@@ -54,7 +54,7 @@ for attempt in $(seq 1 8); do
     output=$(kubectl kustomize "${CILIUM_APP}" --enable-helm \
         | kubectl apply --server-side --force-conflicts -f - 2>&1) || true
     echo "$output"
-    if echo "$output" | grep -qE ' configured$| created$| unchanged$'; then
+    if echo "$output" | grep -qE 'serverside-applied| configured$| created$| unchanged$'; then
         bootstrap_ok=1
         break
     fi
@@ -86,9 +86,6 @@ kubectl apply --server-side -n argocd -f \
 
 echo "[2] Apply local bootstrap patches (insecure mode, kustomize-helm, bcrypt password)"
 kubectl apply --server-side -k /ceph-lab/cluster-bootstrap/argocd/
-
-echo "[3] Wait for ArgoCD server to be ready..."
-kubectl rollout status deployment/argocd-server -n argocd --timeout=5m
 
 echo "[4] Configure repository access"
 if [ -n "$GITOPS_SSH_KEY_PATH" ] && [ -f "/ceph-lab/${GITOPS_SSH_KEY_PATH}" ]; then
