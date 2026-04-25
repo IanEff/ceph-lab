@@ -24,3 +24,14 @@ helmCharts:
       k8sServiceHost: 192.168.56.50
       k8sServicePort: 6443
       ipv4NativeRoutingCIDR: 10.244.0.0/16
+
+patches:
+  # Force operator's cluster-pool CIDR as a CLI arg so it can't lose a race
+  # with the ConfigMap volume mount during initial bootstrap.
+  - target:
+      kind: Deployment
+      name: cilium-operator
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --cluster-pool-ipv4-cidr=10.244.0.0/16
