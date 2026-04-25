@@ -35,3 +35,13 @@ patches:
       - op: add
         path: /spec/template/spec/containers/0/args/-
         value: --cluster-pool-ipv4-cidr=10.244.0.0/16
+
+  # Same fix for the agent DaemonSet — agent pre-computes node pod CIDRs before
+  # the operator starts, so it must also have the correct CIDR pinned as a CLI arg.
+  - target:
+      kind: DaemonSet
+      name: cilium
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --cluster-pool-ipv4-cidr=10.244.0.0/16
