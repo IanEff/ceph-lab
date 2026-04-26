@@ -129,6 +129,7 @@ All policies live in `applications/infrastructure/l7-policies/`. Pattern:
 8. **k3s uses SQLite, not etcd** — `kubeEtcd` scraper is disabled in prometheus values.
 9. **`--enable-helm` is required** — patched into `argocd-cm` via `cluster-bootstrap/argocd/kustomization.yaml`. Without it, `helmCharts:` stanzas do nothing.
 10. **Gateway API manifests must include API-defaulted fields** — The admission webhook injects `group: ""`, `kind: Service`, `weight: 1` into `backendRefs` and `matches` into HTTPRoute rules. Omitting them causes permanent ArgoCD OutOfSync loops. See `docs/gitops-argocd-lessons.md`.
+11. **Cilium IPAM CIDR must match at both install phases** — `install_cilium.sh` (Helm, runs at VM boot) and the GitOps kustomization (applied later by `install_argocd.sh`) are two separate Cilium installs. If `install_cilium.sh` omits `--set "ipam.operator.clusterPoolIPv4PodCIDRList={10.244.0.0/16}"`, the initial ConfigMap gets Helm's default `cluster-pool-ipv4-cidr: 10.0.0.0/8`. Agents initialize IPAM from that value, write `10.0.x.0/24` into CiliumNode specs, and stay stuck there — the later kustomize apply fixes the ConfigMap but doesn't trigger a DaemonSet rollout. Result: all cross-node pod traffic BPF-masquerades and breaks. **`--cluster-pool-ipv4-cidr` is NOT a valid `cilium-agent` flag** (only valid for `cilium-operator`) — do not add it to the DaemonSet args.
 
 ---
 
