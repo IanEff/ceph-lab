@@ -1,6 +1,6 @@
 # ceph-lab — Copilot Instructions
 
-A Rook/Ceph playground on k3s, fully managed by ArgoCD GitOps. One `vagrant up` boots 4 VMs; one `install_argocd.sh` bootstraps the entire stack.
+A Rook/Ceph playground on k3s, fully managed by ArgoCD GitOps. One `make up` boots 4 Lima VMs; one `install_argocd.sh` bootstraps the entire stack.
 
 ---
 
@@ -8,10 +8,12 @@ A Rook/Ceph playground on k3s, fully managed by ArgoCD GitOps. One `vagrant up` 
 
 | Node | IP | Role |
 |---|---|---|
-| `ceph-control` | `192.168.56.50` | k3s server, 2vCPU/3GB |
-| `ceph-node-{1,2,3}` | `192.168.56.{61,62,63}` | k3s agents + Ceph OSDs, 3vCPU/6GB + 2x 10GB OSDs |
+| `ceph-control` | `192.168.56.50` | k3s server, 2 vCPU / 6 GiB (Lima/vz) |
+| `ceph-node-{1,2,3}` | `192.168.56.{61,62,63}` | k3s agents + Ceph OSDs, 3 vCPU / 8 GiB + 2×10 GiB raw OSDs (Lima/vz) |
 | Cilium Gateway | `192.168.56.200` | L2 LB (pool `192.168.56.192/27`) |
 
+Hypervisor: **Lima** with `vmType: vz` (Apple Virtualization.framework) — native performance, no QEMU overhead.  
+Host network: `ceph-lab` socket_vmnet host-only segment (192.168.56.0/24, gateway .1).  
 DNS: `*.ceph.lab → 192.168.56.200` via macOS dnsmasq.
 
 ---
@@ -19,14 +21,20 @@ DNS: `*.ceph.lab → 192.168.56.200` via macOS dnsmasq.
 ## Key commands
 
 ```bash
-# Boot cluster (~10–20 min)
-vagrant up
+# One-time host setup (Lima, socket_vmnet, network config)
+make setup
 
-# Merge kubeconfig + SSH config onto Mac
-uv run provisioning/scripts/manage_k8s_config.py add
+# Boot cluster (~10–20 min first run)
+make up
 
-# Bootstrap ArgoCD (run from inside ceph-control VM)
-bash /vagrant/provisioning/scripts/install_argocd.sh
+# Merge kubeconfig + SSH config onto Mac (re-run after restarts)
+make kubeconfig
+
+# Open a shell on ceph-control
+make ssh
+
+# Bootstrap ArgoCD manually (from inside ceph-control, or if SANDBOX_INSTALL_ARGOCD=0)
+bash /ceph-lab/provisioning/scripts/install_argocd.sh
 
 # Watch all ArgoCD apps
 kubectl get applications -n argocd -w --context ceph-lab
@@ -37,8 +45,11 @@ kubectl exec -it -n rook-ceph deploy/rook-ceph-tools -- ceph status
 # Wipe OSDs for clean Rook reinstall (no VM rebuild)
 bash provisioning/scripts/wipe_ceph_disks.sh
 
-# Full teardown
-uv run provisioning/scripts/manage_k8s_config.py remove && vagrant destroy -f
+# Stop VMs (preserve state)
+make down
+
+# Full teardown (prompts for confirmation)
+make destroy
 ```
 
 ---
@@ -119,8 +130,8 @@ All policies live in `applications/infrastructure/l7-policies/`. Pattern:
 
 ## Critical gotchas
 
-1. **`/dev/sdb` is NOT an OSD** — it's the k3s data disk. `deviceFilter: "^sd[cd]"` in `cephcluster.yaml` targets only `sdc`/`sdd`. Never include `sdb`.
-2. **OSD disks must stay raw** — pre-formatting any block device breaks Rook auto-discovery.
+1. **`/dev/vdb` is NOT an OSD** — it's the k3s data disk (Lima virtio-blk). `deviceFilter: "^vd[cd]"` in `cephcluster.yaml` targets only `vdc`/`vdd`. Never include `vdb`.
+2. **OSD disks must stay raw** — pre-formatting any block device breaks Rook auto-discovery. OSD disks appear as `/dev/vdc` and `/dev/vdd` (Lima virtio-blk), pre-created with `limactl disk create`.
 3. **Gateway API CRDs must precede Cilium** — `install_cilium.sh` applies them first with `kubectl wait`; ArgoCD wave `-15` mirrors this ordering.
 4. **`CephFilesystemSubVolumeGroup` is required** (Rook ≥ v1.17) — without it, CephFS dynamic provisioning silently fails. See `applications/rook/storage/filesystem.yaml`.
 5. **`preserve*OnDelete: true`** on `CephFilesystem` and `CephObjectStore` — ArgoCD can delete their CRs without destroying Ceph data.
@@ -129,7 +140,11 @@ All policies live in `applications/infrastructure/l7-policies/`. Pattern:
 8. **k3s uses SQLite, not etcd** — `kubeEtcd` scraper is disabled in prometheus values.
 9. **`--enable-helm` is required** — patched into `argocd-cm` via `cluster-bootstrap/argocd/kustomization.yaml`. Without it, `helmCharts:` stanzas do nothing.
 10. **Gateway API manifests must include API-defaulted fields** — The admission webhook injects `group: ""`, `kind: Service`, `weight: 1` into `backendRefs` and `matches` into HTTPRoute rules. Omitting them causes permanent ArgoCD OutOfSync loops. See `docs/gitops-argocd-lessons.md`.
-11. **Cilium IPAM CIDR must match at both install phases** — `install_cilium.sh` (Helm, runs at VM boot) and the GitOps kustomization (applied later by `install_argocd.sh`) are two separate Cilium installs. If `install_cilium.sh` omits `--set "ipam.operator.clusterPoolIPv4PodCIDRList={10.244.0.0/16}"`, the initial ConfigMap gets Helm's default `cluster-pool-ipv4-cidr: 10.0.0.0/8`. Agents initialize IPAM from that value, write `10.0.x.0/24` into CiliumNode specs, and stay stuck there — the later kustomize apply fixes the ConfigMap but doesn't trigger a DaemonSet rollout. Result: all cross-node pod traffic BPF-masquerades and breaks. **`--cluster-pool-ipv4-cidr` is NOT a valid `cilium-agent` flag** (only valid for `cilium-operator`) — do not add it to the DaemonSet args.
+11. **Cilium IPAM CIDR must match at both install phases** — `install_cilium.sh` (Helm, runs at VM boot) and the GitOps kustomization (applied later by `install_argocd.sh`) are two separate Cilium installs. If `install_cilium.sh` omits `--set "ipam.operator.clusterPoolIPv4PodCIDRList={10.244.0.0/16}"`, the initial ConfigMap gets Helm's default `cluster-pool-ipv4-cidr: 10.0.0.0/8`. Agents initialize IPAM from that value, write `10.0.x.0/24` into CiliumNode specs, and stay stuck there — the later kustomize apply fixes the ConfigMap but doesn't trigger a DaemonSet rollout. Result: all cross-node pod traffic BPF-masquerades and breaks. Fix is already in `install_cilium.sh`. **`--cluster-pool-ipv4-cidr` is NOT a valid `cilium-agent` flag** (only valid for `cilium-operator`) — do not add it to the DaemonSet args.
+12. **`socket_vmnet` must be at `/opt/socket_vmnet`** — required for the `ceph-lab` host-only network (192.168.56.0/24). Run `make setup` once after installing Lima.
+13. **Lima disks must be pre-created** — `limactl disk create` must run before `limactl start`. `lima-up.sh` handles this automatically; manual starts require running `ensure_disk` first.
+14. **virtiofs mounts are async** — Lima YAML provision steps poll for `/ceph-lab/provisioning/provision.env` (up to 60s) before running scripts. Scripts must not assume `/ceph-lab` is immediately available at VM boot.
+15. **`lima0` default route breaks pod egress** — Lima always adds a `lima0` management interface (192.168.105.0/24) whose DHCP installs a default route at metric 100, beating vzNAT's `eth0` at metric 200. Cilium BPF masquerade SNATs via `eth0`, so outbound pod packets leave on `lima0` with the wrong source IP — ArgoCD can't clone repos. Fix: `dhcp4-overrides: {use-routes: false}` on `lima0` in netplan (already in both Lima templates).
 
 ---
 
@@ -166,7 +181,15 @@ applications/
 cluster-bootstrap/
   argocd/             # ArgoCD install patches (insecure, --enable-helm, limits)
   bootstrap/          # root-app.yaml — the seed Application applied by install_argocd.sh
-provisioning/scripts/ # VM provisioning + host-side helpers
+provisioning/
+  lima/               # Lima VM templates (ceph-control.yaml.tpl, ceph-node.yaml.tpl, networks.yaml)
+  scripts/            # VM provisioning scripts + macOS host helpers
+  provision.env       # Cluster topology defaults (committed; no secrets)
+  lima-up.sh          # Start/provision all VMs
+  lima-down.sh        # Stop VMs (preserve state)
+  lima-destroy.sh     # Delete VMs and disks
+  lima-setup.sh       # One-time host prereqs
+Makefile              # Wrapper targets: make up/down/destroy/ssh/kubeconfig/setup
 docs/
   ceph-cheatsheet.md
   gitops-argocd-lessons.md   # OutOfSync debugging playbook

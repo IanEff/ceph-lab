@@ -7,7 +7,7 @@ This file provides context and specialized instructions for the Gemini CLI agent
 ## What this repo is
 
 A fully-gitopsed **Rook/Ceph playground on k3s**, managed end-to-end by ArgoCD.
-`vagrant up` provisions 4 VMs; `install_argocd.sh` bootstraps the entire software stack
+`make up` provisions 4 Lima VMs; `install_argocd.sh` bootstraps the entire software stack
 from git — no manual kubectl applies.
 
 ---
@@ -16,12 +16,12 @@ from git — no manual kubectl applies.
 
 | Layer | Technology | Version |
 |---|---|---|
-| VMs | Vagrant + VirtualBox | Ubuntu 24.04, 4 nodes |
+| VMs | Lima + vz (Apple Virtualization) | Ubuntu 24.04, 4 nodes |
 | Kubernetes | k3s | 1.32 |
 | CNI, LB & L7 Policies | Cilium | 1.18.2 |
 | Storage | Rook + Ceph Squid | v1.19.1 / v19.2.2 |
 | GitOps | ArgoCD | stable |
-| Ingress | Gateway API (Cilium) | v1.4.1 (HTTP only) |
+| Ingress | Gateway API (Cilium) | v1.4.1 |
 | Observability | Prometheus, Grafana | |
 
 ---
@@ -53,20 +53,19 @@ The `infrastructure-set` ApplicationSet auto-discovers it. No other file needs e
 | -15 | gateway-api CRDs | true | true |
 | -10 | cilium | true | true |
 | -6 | prometheus-operator-crds | true | true |
-| -5 | prometheus, grafana | true | true |
+| -5 | grafana, prometheus | true | true |
 | 1 | l7-policies (CiliumNetworkPolicies) | true | true |
 | 10 | argocd-ingress | true | true |
 | 20 | rook-operator | **false** | true |
-| 25 | rook-cluster + PostSync gate | **false** | **false** |
-| 30 | rook-storage (pools, fs, object) | true | true |
+| 25 | rook-cluster | **false** | **false** |
+| 30 | rook-storage | true | true |
 | 30 | ceph-latency-bridge (SLO metrics) | true | true |
 | 31 | rook-dashboards (Grafana CMs) | true | true |
 | 32 | elk-slo-dashboard (Ceph OSD SLO) | true | true |
-| 35 | rook-gateway (routes) | true | true |
-| 40 | s3-traffic-generator | true | true |
+| 35 | rook-gateway | true | true |
 
 ### 5. Helm is always via Kustomize
-ArgoCD uses `--enable-helm` in `kustomize.buildOptions`. Use `helmCharts:` in `kustomization.yaml` or a wrapper chart.
+ArgoCD uses `--enable-helm` in `kustomize.buildOptions`. Use `helmCharts:` in `kustomization.yaml`.
 
 ### 6. Custom Agent Skills
 This project contains custom Gemini CLI skills in `.github/skills/`. For GitOps operations (like creating infra components or syncing waves), run the `activate_skill` tool with `ceph-gitops` to load the project's specialized workflows and component templates.
@@ -75,17 +74,17 @@ This project contains custom Gemini CLI skills in `.github/skills/`. For GitOps 
 
 ## Critical gotchas
 
-1. **`/dev/sdb` is NOT an OSD** — it's the k3s data disk. `deviceFilter: "^sd[cd]"` in `cephcluster.yaml` targets only `sdc`/`sdd`. Never include `sdb`.
-2. **OSD disks must stay raw** — pre-formatting any block device breaks Rook auto-discovery.
+1. **`/dev/vdb` is NOT an OSD** — it's the k3s data disk (Lima virtio-blk). `deviceFilter: "^vd[cd]"` in `cephcluster.yaml` targets only `vdc`/`vdd`. Never include `vdb`.
+2. **OSD disks must stay raw** — pre-formatting any block device breaks Rook auto-discovery. OSD disks appear as `/dev/vdc` and `/dev/vdd`.
 3. **Gateway API manifests must include API-defaulted fields** — See `docs/gitops-argocd-lessons.md` §3. Omitting them causes permanent ArgoCD OutOfSync loops.
 4. **`CephFilesystemSubVolumeGroup` is required** (Rook ≥ v1.17) — without it, CephFS dynamic provisioning silently fails.
-5. **ArgoCD runs insecure** — TLS is disabled. Cilium Gateway runs HTTP-only (port 80). Service URLs work at http://*.ceph.lab.
-6. **L7 Policies (CNP) are in effect** — Cilium Network Policies in `applications/infrastructure/l7-policies/` enforce strict network isolation. **Crucial**: Egress to the Kubernetes API server (`kube-apiserver`) must be explicitly allowed for components that need to query the API (like `kube-state-metrics`). The `l7-visibility` policy in the `monitoring` namespace handles this via `toEntities: [ cluster, kube-apiserver ]`.
-7. **OSD Performance Histograms precision** — Ceph OSD histograms (via `ceph-latency-bridge`) export bucket boundaries with high floating-point precision (e.g., `le="0.099999"` instead of `0.1`). PromQL queries in dashboards and rules MUST match these exact labels.
-8. **Resource Limits in Monitoring** — Prometheus-related components (especially `kube-state-metrics` and `prometheus-server`) are resource-heavy in this lab environment. If they enter `CrashLoopBackOff`, check memory limits first; `kube-state-metrics` needs at least 256Mi and `prometheus-server` needs 1Gi to handle substantial dashboards.
-9. **ArgoCD Sync Loops during Debugging** — When performing emergency manual fixes via `kubectl patch/apply`, ArgoCD's `selfHeal` will often immediately revert them. To stop this loop, disable sync on the **root app** (`ceph-lab-root`) first, then the specific Application, then perform your fix. Don't forget to re-enable them after pushing to Git.
-10. **Histogram Bucket Ordering** — Custom Prometheus exporters (like `ceph-latency-bridge`) MUST export histogram buckets in strictly ascending `le` order with `+Inf` at the end. Out-of-order buckets will cause Prometheus to discard the metrics.
-11. **Definitive Observability Dashboard** — `ceph-observability-mach-2.json` (in `applications/rook/dashboards/`) is the definitive reference for the 3-row narrative (Health → SLI → SLO). It uses per-OSD P99 lines for granular latency tracking and implements burn-rate alerting.
+5. **ArgoCD runs insecure** — TLS terminates at the Cilium Gateway. Service URLs work at https://*.ceph.lab.
+6. **L7 Policies (CNP) are in effect** — Cilium Network Policies in `applications/infrastructure/l7-policies/` enforce strict network isolation.
+7. **OSD Performance Histograms precision** — Ceph OSD histograms (via `ceph-latency-bridge`) export bucket boundaries with high floating-point precision (e.g., `le="0.099999"`). PromQL queries MUST match these exact labels.
+8. **`virtiofs` mounts are async** — Lima YAML provision steps poll for `/ceph-lab/provisioning/provision.env` (up to 60s) before running scripts.
+9. **`socket_vmnet` requirement** — Must be at `/opt/socket_vmnet` for the 192.168.56.0/24 host-only network. Run `make setup` once.
+10. **`lima0` default route break** — DHCP on `lima0` must have `use-routes: false` to prevent pod egress breakage (already in templates).
+11. **Definitive Observability Dashboard** — `ceph-observability-mach-2.json` is the definitive reference for Health → SLI → SLO.
 
 ---
 
@@ -93,8 +92,8 @@ This project contains custom Gemini CLI skills in `.github/skills/`. For GitOps 
 
 | Node | IP | Role |
 |---|---|---|
-| `ceph-control` | `192.168.56.50` | k3s server, 2 vCPU / 3 GB |
-| `ceph-node-{1,2,3}` | `192.168.56.{61,62,63}` | k3s agents + Ceph OSDs, 3 vCPU / 6 GB + 2×10 GB raw OSDs |
+| `ceph-control` | `192.168.56.50` | k3s server, 2 vCPU / 6 GiB (Lima/vz) |
+| `ceph-node-{1,2,3}` | `192.168.56.{61,62,63}` | k3s agents + Ceph OSDs, 3 vCPU / 8 GiB + 2×10 GiB raw OSDs (Lima/vz) |
 | Cilium Gateway | `192.168.56.200` | L2 LB (pool `192.168.56.192/27`) |
 
 DNS: `*.ceph.lab → 192.168.56.200` via macOS dnsmasq.
@@ -105,12 +104,12 @@ DNS: `*.ceph.lab → 192.168.56.200` via macOS dnsmasq.
 
 | Service | URL |
 |---|---|
-| ArgoCD | http://argocd.ceph.lab |
-| Grafana | http://grafana.ceph.lab |
-| Ceph Dashboard | http://dashboard.ceph.lab |
-| Hubble UI | http://hubble.ceph.lab |
-| Prometheus | http://prometheus.ceph.lab |
-| S3 (objectstore) | http://s3.ceph.lab |
+| ArgoCD | https://argocd.ceph.lab |
+| Grafana | https://grafana.ceph.lab |
+| Ceph Dashboard | https://dashboard.ceph.lab |
+| Hubble UI | https://hubble.ceph.lab |
+| Prometheus | https://prometheus.ceph.lab |
+| S3 (objectstore) | https://s3.ceph.lab |
 
 ---
 
@@ -125,19 +124,16 @@ applications/
     gateway-api/    # Infrastructure for Gateway API (CRDs)
     prometheus/     # Time-series database
     grafana/        # Dashboards & Visualization
-    prometheus-operator-crds/ # Foundation for monitoring CRDs
     cilium/         # CNI & Gateway
     l7-policies/    # Network security policies
-    elk-slo-dashboard/ # Ceph OSD SLO alerts and dashboard
-    ceph-latency-bridge/ # Native OSD histogram reconstruction
-    s3-traffic-generator/ # Load generator for RGW
   clusters/ceph-lab/ # ApplicationSet (infra-set.yaml) + per-wave Rook Applications
-  rook/             # Kustomize bases for rook-operator, cluster, storage, gateway, and dashboards
+  rook/             # Kustomize bases: operator, cluster, storage, gateway, dashboards
 cluster-bootstrap/
   argocd/           # ArgoCD install patches (insecure, --enable-helm, limits)
   bootstrap/        # root-app.yaml — the seed Application applied by install_argocd.sh
-provisioning/scripts/ # VM provisioning + host-side helpers (dnsmasq, trust_ca, UI access scripts)
-docs/               # runbooks, operational posture, observability tour, gitops lessons
+provisioning/
+  lima/             # Lima VM templates
+  scripts/          # VM provisioning scripts + macOS host helpers
 ```
 
 ---
@@ -145,11 +141,11 @@ docs/               # runbooks, operational posture, observability tour, gitops 
 ## Common commands
 
 ```bash
-vagrant up                                                          # boot cluster
-uv run provisioning/scripts/manage_k8s_config.py add             # merge kubeconfig
-bash provisioning/scripts/install_argocd.sh                       # bootstrap ArgoCD
-kubectl get applications -n argocd -w --context ceph-lab          # watch sync
+make up                                                             # boot cluster
+make kubeconfig                                                     # merge kubeconfig + SSH config
+make ssh                                                            # shell on ceph-control
+kubectl get applications -n argocd -w --context ceph-lab            # watch sync
 kubectl exec -it -n rook-ceph deploy/rook-ceph-tools -- ceph status
-bash provisioning/scripts/wipe_ceph_disks.sh                      # wipe OSDs
-bash provisioning/scripts/open_urls.sh                            # quickly open all UIs
+bash provisioning/scripts/wipe_ceph_disks.sh                        # wipe OSDs
+bash provisioning/scripts/open_urls.sh                              # quickly open all UIs
 ```
