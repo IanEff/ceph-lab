@@ -52,9 +52,22 @@ applications/
   infrastructure/     # one dir per infra component; each has config.json + kustomization.yaml
     ceph-latency-bridge/  # native OSD histogram reconstruction (wave 30)
     elk-slo-dashboard/    # Ceph OSD SLO alerts and dashboard (wave 32)
-  clusters/ceph-lab/  # ApplicationSet (infra-set.yaml) + per-wave Rook Applications
-  rook/               # Kustomize bases: operator, cluster, storage, gateway
-    dashboards/       # Grafana dashboard JSONs loaded as ConfigMaps (wave 31)
+    l7-policies/      # CiliumNetworkPolicies, organized by namespace subdirectory
+      argocd/         # cnp-argocd.yaml
+      ceph-clients/   # cnp-ceph-clients.yaml
+      monitoring/     # cnp-monitoring.yaml, cnp-monitoring-debug.yaml, cnp-monitoring-debug-cidr.yaml
+      rook-ceph/      # cnp-rook-ceph.yaml
+  clusters/ceph-lab/  # ApplicationSets + individual Rook Applications
+    infra-set.yaml    # discovers applications/infrastructure/**/config.json
+    rook-set.yaml     # discovers applications/rook/**/config.json (storage, gateway, dashboards, operator)
+    rook-operator.yaml  # individual Application — prune=false, selfHeal=true
+    rook-cluster.yaml   # individual Application — prune=false, selfHeal=false
+  rook/               # Kustomize bases; each has config.json for rook-set.yaml discovery
+    operator/         # wave 20
+    cluster/          # wave 25 (no config.json — managed by rook-cluster.yaml directly)
+    storage/          # wave 30
+    dashboards/       # wave 31 — Grafana dashboard JSONs loaded as ConfigMaps
+    gateway/          # wave 35
 cluster-bootstrap/
   argocd/             # ArgoCD install patches (insecure mode, --enable-helm, resource limits)
   bootstrap/          # root-app.yaml — the seed Application that ArgoCD self-manages
@@ -107,7 +120,7 @@ ArgoCD uses `--enable-helm` in `kustomize.buildOptions`. Two patterns:
 
 ### CiliumNetworkPolicies
 
-All policies live in `applications/infrastructure/l7-policies/`. One policy per namespace named `l7-visibility`, with `endpointSelector: {}`. Egress must always include DNS (`kube-system/kube-dns`).
+All policies live in `applications/infrastructure/l7-policies/`, organized into namespace subdirectories (`argocd/`, `ceph-clients/`, `monitoring/`, `rook-ceph/`). One policy per namespace named `l7-visibility`, with `endpointSelector: {}`. Egress must always include DNS (`kube-system/kube-dns`).
 
 ---
 
