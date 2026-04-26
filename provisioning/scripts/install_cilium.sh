@@ -35,6 +35,7 @@ helm upgrade --install cilium cilium/cilium \
     --set routingMode=native \
     --set autoDirectNodeRoutes=true \
     --set ipv4NativeRoutingCIDR="10.244.0.0/16" \
+    --set "ipam.operator.clusterPoolIPv4PodCIDRList={10.244.0.0/16}" \
     --set bpf.masquerade=true \
     --set datapathMode=netkit \
     --set "devices=eth+" \
