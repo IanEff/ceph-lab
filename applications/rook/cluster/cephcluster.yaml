@@ -6,7 +6,7 @@ metadata:
 spec:
   # ── Ceph version ──────────────────────────────────────────────────────────
   cephVersion:
-    image: quay.io/ceph/ceph:v19.2.2 # Squid — keep in sync with toolbox.yaml
+    image: quay.io/ceph/ceph:v19.2.3 # Squid — keep in sync with toolbox.yaml
     allowUnsupported: false
 
   dataDirHostPath: /var/lib/rook
