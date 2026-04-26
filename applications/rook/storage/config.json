@@ -1,0 +1,1 @@
+{ "appName": "rook-storage", "syncWave": "30", "namespace": "rook-ceph", "localPath": "applications/rook/storage" }

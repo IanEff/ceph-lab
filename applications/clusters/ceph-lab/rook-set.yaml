@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: rook-set
+  namespace: argocd
+spec:
+  generators:
+    - git:
+        repoURL: git@github.com:ianeff/ceph-lab.git
+        revision: HEAD
+        files:
+          - path: applications/rook/**/config.json
+  template:
+    metadata:
+      name: "{{appName}}"
+      namespace: argocd
+      annotations:
+        argocd.argoproj.io/sync-wave: "{{syncWave}}"
+    spec:
+      project: default
+      source:
+        repoURL: git@github.com:ianeff/ceph-lab.git
+        targetRevision: HEAD
+        path: "{{localPath}}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{namespace}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

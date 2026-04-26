@@ -4,14 +4,13 @@ namespace: argocd
 
 resources:
   # Infrastructure (waves -15 → 10): Gateway API, Cilium, cert-manager,
-  # observability stack, secrets, policies, ArgoCD ingress
+  # observability stack, policies, ArgoCD ingress
   - infra-set.yaml
 
-  # Rook Ceph (waves 20 → 35): operator → cluster → storage → routes
-  # Individual Applications here so each gets its own sync policy.
+  # Rook Ceph (waves 20 → 35): operator → cluster → storage → dashboards → routes
+  # rook-operator: hand-crafted (prune: false — can't template booleans in ApplicationSet)
+  # rook-cluster:  hand-crafted (prune: false + ignoreDifferences)
+  # rook-set:      storage / dashboards / gateway (uniform prune:true/selfHeal:true)
   - rook-operator.yaml
   - rook-cluster.yaml
-  - rook-storage.yaml
-  - rook-gateway.yaml
-  # Grafana dashboards for Ceph Cluster, OSD, and Pools (wave 31)
-  - rook-dashboards.yaml
+  - rook-set.yaml
