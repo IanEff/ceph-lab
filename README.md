@@ -18,8 +18,8 @@ A fully-gitopsed Rook/Ceph playground on k3s - a sandbox to play around with cep
 | Layer | Technology | Notes |
 |---|---|---|
 | VMs | Vagrant + VirtualBox | Ubuntu 24.04, 4 nodes |
-| Kubernetes | k3s v1.32 | Single binary, SQLite, ~500 MB RAM |
-| CNI + LB | Cilium 1.18.2 | eBPF, kube-proxy free, Gateway API, L2 LB, Hubble |
+| Kubernetes | k3s v1.33 | Single binary, SQLite, ~500 MB RAM |
+| CNI + LB | Cilium 1.19.3 | eBPF, kube-proxy free, Gateway API, L2 LB, Hubble |
 | Storage | Rook v1.19.1 + Ceph Squid v19.2.2 | RBD, CephFS, RGW (S3) |
 | GitOps | ArgoCD stable | Kustomize-Helm, sync waves, insecure (TLS at gateway) |
 | TLS | cert-manager v1.14.5 | Self-signed CA `ceph-lab-ca`, wildcard `*.ceph.lab` |
@@ -194,8 +194,8 @@ All tuneable via `.env` (see `.env.example` for descriptions):
 | `SANDBOX_INSTALL_ARGOCD` | 0 | Auto-run bootstrap after `vagrant up` |
 | `SANDBOX_CONFIGURE_DNSMASQ` | 1 | Write macOS dnsmasq entry for `*.ceph.lab` |
 | `ROOK_VERSION` | v1.19.1 | Rook Helm chart version |
-| `CILIUM_VERSION` | 1.18.2 | Cilium Helm chart version |
-| `GATEWAY_API_VERSION` | v1.4.1 | Gateway API CRD version |
+| `CILIUM_VERSION` | 1.19.3 | Cilium Helm chart version |
+| `GATEWAY_API_VERSION` | v1.5.1 | Gateway API CRD version |
 | `ARGOCD_VERSION` | stable | ArgoCD install channel or tag |
 
 ---

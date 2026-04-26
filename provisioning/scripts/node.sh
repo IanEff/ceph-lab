@@ -4,7 +4,7 @@
 set -euo pipefail
 
 CONTROL_PLANE_IP="${SANDBOX_CONTROL_PLANE_IP:-192.168.56.50}"
-K3S_CHANNEL="${SANDBOX_K3S_CHANNEL:-v1.32}"
+K3S_CHANNEL="${SANDBOX_K3S_CHANNEL:-v1.33}"
 
 # Detect this node's static IP on the ceph-lab host-only interface (eth1).
 NODE_IP=$(ip -4 addr show | grep '192\.168\.56\.' | awk '{print $2}' | cut -d/ -f1 | head -n1)

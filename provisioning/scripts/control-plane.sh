@@ -4,9 +4,9 @@
 set -euo pipefail
 
 CONTROL_PLANE_IP="${SANDBOX_CONTROL_PLANE_IP:-192.168.56.50}"
-K3S_CHANNEL="${SANDBOX_K3S_CHANNEL:-v1.32}"
-CILIUM_VERSION="${CILIUM_VERSION:-1.18.2}"
-GATEWAY_API_VERSION="${GATEWAY_API_VERSION:-v1.4.1}"
+K3S_CHANNEL="${SANDBOX_K3S_CHANNEL:-v1.33}"
+CILIUM_VERSION="${CILIUM_VERSION:-1.19.3}"
+GATEWAY_API_VERSION="${GATEWAY_API_VERSION:-v1.5.1}"
 
 # Lima provision steps run as root directly; SUDO_USER is never set.
 # Source Lima's cidata env for the authoritative interactive user identity.

@@ -17,11 +17,11 @@ from git — no manual kubectl applies.
 | Layer | Technology | Version |
 |---|---|---|
 | VMs | Lima + vz (Apple Virtualization) | Ubuntu 24.04, 4 nodes |
-| Kubernetes | k3s | 1.32 |
-| CNI, LB & L7 Policies | Cilium | 1.18.2 |
+| Kubernetes | k3s | 1.33 |
+| CNI, LB & L7 Policies | Cilium | 1.19.3 |
 | Storage | Rook + Ceph Squid | v1.19.1 / v19.2.2 |
 | GitOps | ArgoCD | stable |
-| Ingress | Gateway API (Cilium) | v1.4.1 |
+| Ingress | Gateway API (Cilium) | v1.5.1 |
 | Observability | Prometheus, Grafana | |
 
 ---

@@ -3,4 +3,4 @@ kind: Kustomization
 # Installs experimental Gateway API CRDs (includes GRPCRoute for Hubble relay).
 # Update the version tag to match GATEWAY_API_VERSION in gitops.env.
 resources:
-  - https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.1/experimental-install.yaml
+  - https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/experimental-install.yaml

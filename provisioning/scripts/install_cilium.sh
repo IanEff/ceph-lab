@@ -4,8 +4,8 @@
 # Called by control-plane.sh; can also be re-run idempotently.
 set -euo pipefail
 
-CILIUM_VERSION="${CILIUM_VERSION:-1.18.2}"
-GATEWAY_API_VERSION="${GATEWAY_API_VERSION:-v1.4.1}"
+CILIUM_VERSION="${CILIUM_VERSION:-1.19.3}"
+GATEWAY_API_VERSION="${GATEWAY_API_VERSION:-v1.5.1}"
 CONTROL_PLANE_IP="${SANDBOX_CONTROL_PLANE_IP:-192.168.56.50}"
 
 export KUBECONFIG=/root/.kube/config
@@ -53,7 +53,7 @@ kubectl rollout status daemonset/cilium -n kube-system --timeout=3m
 
 echo "[cilium] Installing Hubble CLI"
 ARCH=$(dpkg --print-architecture)
-HUBBLE_VERSION="v1.17.2"
+HUBBLE_VERSION="v1.19.3"
 curl -fsSL -o /tmp/hubble.tar.gz \
     "https://github.com/cilium/hubble/releases/download/${HUBBLE_VERSION}/hubble-linux-${ARCH}.tar.gz"
 tar -xzf /tmp/hubble.tar.gz -C /tmp hubble

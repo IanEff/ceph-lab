@@ -19,12 +19,12 @@ from git — no manual kubectl applies.
 | Layer | Technology | Version |
 |---|---|---|
 | VMs | Vagrant + VirtualBox | Ubuntu 24.04, 4 nodes |
-| Kubernetes | k3s | 1.32 |
-| CNI + LB | Cilium | 1.18.2 |
+| Kubernetes | k3s | 1.33 |
+| CNI + LB | Cilium | 1.19.3 |
 | Storage | Rook + Ceph Squid | v1.19.1 / v19.2.2 |
 | GitOps | ArgoCD | stable |
 | TLS | cert-manager | v1.14.5 |
-| Ingress | Gateway API (Cilium) | v1.4.1 |
+| Ingress | Gateway API (Cilium) | v1.5.1 |
 | Observability | kube-prometheus-stack | Prometheus + Grafana |
 
 ---
