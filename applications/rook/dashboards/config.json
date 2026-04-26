@@ -1,0 +1,6 @@
+{
+    "appName": "rook-dashboards",
+    "syncWave": "31",
+    "namespace": "rook-ceph",
+    "localPath": "applications/rook/dashboards"
+}

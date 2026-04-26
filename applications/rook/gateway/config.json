@@ -1,0 +1,6 @@
+{
+    "appName": "rook-gateway",
+    "syncWave": "35",
+    "namespace": "rook-ceph",
+    "localPath": "applications/rook/gateway"
+}

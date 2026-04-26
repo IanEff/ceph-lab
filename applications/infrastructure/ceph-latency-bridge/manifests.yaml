@@ -19,22 +19,31 @@ spec:
       serviceAccountName: rook-ceph-default
       containers:
         - name: bridge
-          image: quay.io/ceph/ceph:v19.2.2
+          image: quay.io/ceph/ceph:v19.2.3
           command:
             - /bin/bash
             - -c
             - |
-              # Bootstrap ceph.conf
-              MON_ENDPOINTS=$(cat /etc/rook/mon-endpoints | tr ',' '\n' | awk -F= '{print $2}' | paste -sd,)
-              echo "[global]" > /etc/ceph/ceph.conf
-              echo "mon host = ${MON_ENDPOINTS}" >> /etc/ceph/ceph.conf
-              echo "auth cluster required = cephx" >> /etc/ceph/ceph.conf
-              echo "auth service required = cephx" >> /etc/ceph/ceph.conf
-              echo "auth client required  = cephx" >> /etc/ceph/ceph.conf
-              
-              CEPH_SECRET=$(cat /var/lib/rook-ceph-mon/secret.keyring)
-              printf '[client.admin]\n\tkey = %s\n' "${CEPH_SECRET}" > /etc/ceph/keyring
-              
+              # Bootstrap ceph.conf from the mon-endpoints ConfigMap, retrying until
+              # the cluster is reachable. Prevents the exporter from starting with a
+              # stale/empty config when this pod races with mon election at wave 30.
+              until
+                MON_ENDPOINTS=$(cat /etc/rook/mon-endpoints | tr ',' '\n' | awk -F= '{print $2}' | paste -sd,)
+                {
+                  echo "[global]"
+                  echo "mon host = ${MON_ENDPOINTS}"
+                  echo "auth cluster required = cephx"
+                  echo "auth service required = cephx"
+                  echo "auth client required  = cephx"
+                } > /etc/ceph/ceph.conf
+                CEPH_SECRET=$(cat /var/lib/rook-ceph-mon/secret.keyring)
+                printf '[client.admin]\n\tkey = %s\n' "${CEPH_SECRET}" > /etc/ceph/keyring
+                ceph status &>/dev/null
+              do
+                echo "Waiting for Ceph mons to be reachable (retrying in 10s)..."
+                sleep 10
+              done
+              echo "Ceph cluster reachable — starting exporter."
               # Run the exporter script
               python3 /opt/ceph-exporter/ceph_latency_exporter.py
           ports:

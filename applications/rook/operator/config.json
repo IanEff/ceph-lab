@@ -1,0 +1,6 @@
+{
+    "appName": "rook-operator",
+    "syncWave": "20",
+    "namespace": "rook-ceph",
+    "localPath": "applications/rook/operator"
+}
