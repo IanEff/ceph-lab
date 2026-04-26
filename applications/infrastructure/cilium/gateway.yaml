@@ -16,6 +16,21 @@ spec:
         namespaces:
           from: All
 
+    # HTTPS — TLS terminates here; static self-signed cert in gateway-tls-secret.yaml.
+    # Use --insecure on the CLI; browsers can click through the warning.
+    - name: https
+      port: 443
+      protocol: HTTPS
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: gateway-tls
+
     # Cleartext gRPC for Hubble relay (Cilium proxies it, observes l7 flows)
     - name: hubble-relay
       port: 4245

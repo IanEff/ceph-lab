@@ -76,6 +76,11 @@ replacements:
           name: argocd
         fieldPaths:
           - spec.hostnames.0
+      - select:
+          kind: GRPCRoute
+          name: argocd-grpc
+        fieldPaths:
+          - spec.hostnames.0
 
   - source:
       kind: ConfigMap
