@@ -16,6 +16,6 @@ spec:
   nodeSelector:
     matchLabels: {}
   interfaces:
-    - "^enp"    # VirtualBox host-only NIC pattern
+    - "^eth"    # Lima vz NIC pattern (eth0=vzNAT, eth1=ceph-lab host-only)
   externalIPs: false
   loadBalancerIPs: true
