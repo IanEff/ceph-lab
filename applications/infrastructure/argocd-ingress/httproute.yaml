@@ -11,11 +11,6 @@ spec:
       kind: Gateway
       name: cilium-gateway
       namespace: kube-system
-      sectionName: http
-    - group: gateway.networking.k8s.io
-      kind: Gateway
-      name: cilium-gateway
-      namespace: kube-system
       sectionName: https
   rules:
     - matches:
