@@ -17,7 +17,7 @@ A fully-gitopsed Rook/Ceph playground on k3s - a sandbox to play around with cep
 
 | Layer | Technology | Notes |
 |---|---|---|
-| VMs | Vagrant + VirtualBox | Ubuntu 24.04, 4 nodes |
+| VMs | Lima + Apple Virtualization.framework | Ubuntu 24.04, 4 nodes, `vmType: vz` |
 | Kubernetes | k3s v1.33 | Single binary, SQLite, ~500 MB RAM |
 | CNI + LB | Cilium 1.19.3 | eBPF, kube-proxy free, Gateway API, L2 LB, Hubble |
 | Storage | Rook v1.19.1 + Ceph Squid v19.2.2 | RBD, CephFS, RGW (S3) |
@@ -35,15 +35,16 @@ A fully-gitopsed Rook/Ceph playground on k3s - a sandbox to play around with cep
   │  *.ceph.lab → 192.168.56.200 (via dnsmasq)      │
   └────────────┬────────────────────────────────────┘
                │ host-only network (192.168.56.0/24)
+               │ (socket_vmnet — Lima ceph-lab network)
      ┌─────────▼──────────┐
-     │  ceph-control :50  │  k3s server  2 vCPU / 3 GB
+     │  ceph-control :50  │  k3s server  2 vCPU / 6 GiB
      └─────────┬──────────┘
                │
      ┌─────────▼──────────────────────────────┐
      │  ceph-node-1/2/3  :61/:62/:63          │
      │  k3s agents + Ceph OSDs                │
-     │  3 vCPU / 6 GB each                    │
-     │  /dev/sdc + /dev/sdd (10 GB, raw)       │
+     │  3 vCPU / 8 GiB each                   │
+     │  /dev/vdc + /dev/vdd (10 GiB, raw)      │
      └────────────────────────────────────────┘
                │
      ┌─────────▼──────────────────────────────┐
@@ -56,9 +57,10 @@ A fully-gitopsed Rook/Ceph playground on k3s - a sandbox to play around with cep
 
 ## Prerequisites
 
-- VirtualBox 7.x
-- Vagrant 2.3+
-- `brew install helm kubectl direnv jq` on your Mac
+- macOS 13+ (Apple Silicon or Intel)
+- [Lima](https://lima-vm.io/) — `brew install lima`
+- [socket_vmnet](https://github.com/lima-vm/socket_vmnet) — `brew install socket_vmnet` then `make setup` once
+- `brew install helm kubectl jq yq`
 
 ---
 
@@ -69,29 +71,24 @@ A fully-gitopsed Rook/Ceph playground on k3s - a sandbox to play around with cep
 git clone https://github.com/YOUR_USERNAME/ceph-lab.git
 cd ceph-lab
 
-# 2. Configure your environment
+# 2. One-time host setup (Lima networks, socket_vmnet)
+make setup
+
+# 3. Configure your environment
 cp .env.example .env
 # Edit .env — at minimum set:
-#   GITOPS_REPO_URL=https://github.com/YOUR_USERNAME/ceph-lab.git
-#   GITOPS_REPO_TOKEN=ghp_...  (or GITOPS_SSH_KEY_PATH for SSH deploy key)
-direnv allow
+#   GITOPS_REPO_URL=git@github.com:YOUR_USERNAME/ceph-lab.git
+#   (plus SSH deploy key or HTTPS token)
 
-# 3. Boot the cluster (~10–20 min)
-vagrant up
+# 4. Boot the cluster (~10–20 min first run)
+make up
+# This creates 4 Lima VMs, provisions k3s + Cilium, merges kubeconfig,
+# configures dnsmasq, and bootstraps ArgoCD — all in one shot.
 
-# 4. Merge kubeconfig + SSH config onto your Mac
-uv run provisioning/scripts/manage_k8s_config.py add
-
-# 5. (Optional — if SANDBOX_INSTALL_ARGOCD=0) — bootstrap ArgoCD manually
-vagrant ssh ceph-control
-bash /vagrant/provisioning/scripts/install_argocd.sh
-
-# 6. Watch ArgoCD sync the world
+# 5. Watch ArgoCD sync the world
 kubectl get applications -n argocd -w --context ceph-lab
 
-# 7. Install Rook Ceph (once infra wave has settled, ~5–10 min)
-# ArgoCD drives rook waves 20 through 35 automatically.
-# To watch Ceph health:
+# 6. Check Ceph health (once rook waves settle, ~5–10 min)
 kubectl exec -it -n rook-ceph deploy/rook-ceph-tools -- ceph status
 ```
 
@@ -122,15 +119,17 @@ Everything is deployed in dependency order — no manual sequencing needed:
 |---|---|---|
 | -15 | gateway-api CRDs | Must exist before Cilium starts |
 | -10 | cilium | Gateway CRDs must precede; creates GatewayClass |
-| -5 | cert-manager, kube-prometheus-stack | Observability backbone |
-| 0 | metrics-server | |
+| -6 | prometheus-operator-crds | CRDs before the stack |
+| -5 | grafana, prometheus | Observability backbone |
 | 1 | l7-policies | CiliumNetworkPolicies (Cilium must exist) |
-| 10 | argocd-ingress | HTTPRoutes for ArgoCD UI |
+| 10 | argocd-ingress | HTTPRoutes + GRPCRoute for ArgoCD UI |
 | 20 | rook operator | Helm chart, CRDs |
-| 25 | rook cluster | CephCluster CR — waits for operator |
-| 30 | rook storage | BlockPool, CephFS, ObjectStores, toolbox (prune=true) |
+| 25 | rook cluster | CephCluster CR — PostSync gate blocks until `HEALTH_OK` |
+| 30 | rook storage, ceph-latency-bridge | BlockPool, CephFS, ObjectStores, toolbox; SLO metrics exporter |
 | 31 | rook dashboards | Grafana ConfigMaps for Ceph Cluster/OSD/Pool views |
-| 35 | rook gateway | HTTPRoutes for Ceph Dashboard, Hubble, S3 endpoints |
+| 32 | elk-slo-dashboard | Ceph OSD SLO alerts and burn-rate dashboard |
+| 35 | rook gateway | HTTPRoutes for Ceph Dashboard, S3 endpoints |
+| 40 | s3-traffic-generator | Optional load generator for S3 |
 
 ---
 
@@ -154,7 +153,7 @@ argo-sync       # argocd app sync --all
 hubble-rook     # hubble observe --namespace rook-ceph
 hubble-drops    # hubble observe --verdict DROPPED
 get-pass        # extract dashboard password into clipboard
-open-urls       # bash /vagrant/provisioning/scripts/open_urls.sh
+open-urls       # bash /ceph-lab/provisioning/scripts/open_urls.sh
 ```
 
 ---
@@ -166,8 +165,8 @@ open-urls       # bash /vagrant/provisioning/scripts/open_urls.sh
 bash provisioning/scripts/wipe_ceph_disks.sh
 
 # Then from inside ceph-control:
-vagrant ssh ceph-control
-bash /vagrant/provisioning/scripts/install_argocd.sh
+make ssh
+bash /ceph-lab/provisioning/scripts/install_argocd.sh
 # ArgoCD will re-sync and redeploy Rook from scratch
 ```
 
@@ -176,8 +175,8 @@ bash /vagrant/provisioning/scripts/install_argocd.sh
 ## Full teardown
 
 ```bash
-uv run provisioning/scripts/manage_k8s_config.py remove
-vagrant destroy -f
+python3 provisioning/scripts/manage_k8s_config.py remove
+make destroy
 ```
 
 ---
@@ -191,7 +190,7 @@ All tuneable via `.env` (see `.env.example` for descriptions):
 | `GITOPS_REPO_URL` | *(required)* | Your fork's clone URL |
 | `SANDBOX_NUM_CEPH_NODES` | 3 | Worker count (min 3 for HA) |
 | `SANDBOX_OSD_DISKS_PER_NODE` | 2 | Raw OSD disks per worker |
-| `SANDBOX_INSTALL_ARGOCD` | 0 | Auto-run bootstrap after `vagrant up` |
+| `SANDBOX_INSTALL_ARGOCD` | 1 | Auto-run bootstrap after `make up` |
 | `SANDBOX_CONFIGURE_DNSMASQ` | 1 | Write macOS dnsmasq entry for `*.ceph.lab` |
 | `ROOK_VERSION` | v1.19.1 | Rook Helm chart version |
 | `CILIUM_VERSION` | 1.19.3 | Cilium Helm chart version |
@@ -221,10 +220,13 @@ See also:
 
 ## Architecture notes
 
-- **k3s not kubeadm** — k3s uses SQLite instead of etcd, saving ~600 MB on the control node. This is important because `ceph-control` is only 3 GB and also runs Rook's operator + CSI pods.
-- **OSD disks must stay raw** — Rook auto-discovers `/dev/sdc` and `/dev/sdd` on each worker. Pre-formatting them will break OSD creation.
+- **k3s not kubeadm** — k3s uses SQLite instead of etcd, saving ~600 MB on the control node. This is important because `ceph-control` is only 6 GiB and also runs Rook's operator + CSI pods.
+- **Lima vmType: vz** — uses Apple's Virtualization.framework directly; native performance on Apple Silicon and Intel Macs running macOS 13+. No QEMU overhead.
+- **OSD disks must stay raw** — Rook auto-discovers `/dev/vdc` and `/dev/vdd` on each worker (Lima virtio-blk). Pre-formatting them will break OSD creation.
+- **`/dev/vdb` is the k3s data disk** — not an OSD. The `deviceFilter: "^vd[cd]"` in `cephcluster.yaml` targets only `vdc`/`vdd`.
 - **`preserve*OnDelete: true`** is set on CephFilesystem and CephObjectStore as a safety net against accidental sync prunes.
 - **Cilium replaces kube-proxy** — do not install kube-proxy; Cilium handles all service routing via eBPF.
 - **Gateway API CRDs must precede Cilium** — `install_cilium.sh` installs them first so Cilium discovers the CRDs on startup and auto-creates the `cilium` GatewayClass.
 - **CephFilesystemSubVolumeGroup is required** (Rook v1.17+) — included in `rook/storage/filesystem.yaml`. Without it dynamic CephFS provisioning silently fails.
+- **PostSync health gate** — `rook-cluster` has a PostSync Job that polls `CephCluster` until `state=Connected` and `health=HEALTH_OK` before ArgoCD advances to wave 30.
 - **Hubble metrics** are disabled at bootstrap (chicken-and-egg with Prometheus CRDs) and should be enabled once `kube-prometheus-stack` is synced.
