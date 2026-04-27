@@ -1,0 +1,137 @@
+# Lima VM definition — ceph-control (k3s server + Cilium)
+#
+# Lima v2.0+ native: no sed substitution needed.
+#
+# Usage (handled automatically by lima-up.sh):
+#   limactl create -y --name=ceph-control \
+#     --set '.param.ProjectRoot = "/abs/path/to/ceph-lab"' \
+#     provisioning/lima/ceph-control.yaml
+#   limactl start -y --timeout 35m ceph-control
+#
+# vmType: vz uses Apple's Virtualization.framework — native performance on
+# Apple Silicon and Intel Macs running macOS 13+.
+
+minimumLimaVersion: "2.0.0"
+vmType: "vz"
+os: "Linux"
+# arch omitted — Lima defaults to the host architecture
+
+cpus: 2
+memory: "6GiB"
+disk: "40GiB"
+
+# k3s ships its own containerd — Lima's nerdctl install wastes ~10 min on first boot.
+containerd:
+  system: false
+  user: false
+
+# Ubuntu 24.04 LTS — arm64 and amd64 variants; Lima picks the right one
+images:
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-\
+      server-cloudimg-arm64.img"
+    arch: "aarch64"
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-\
+      server-cloudimg-amd64.img"
+    arch: "x86_64"
+
+# Secondary block device for /var/lib/rancher — keeps k3s data off the root disk.
+# Must be pre-created with `limactl disk create` before starting this instance.
+additionalDisks:
+  - name: "ceph-control-rancher"
+    size: "20GiB"
+
+# Mount the project root at /ceph-lab (virtiofs — low-latency, writable).
+# ProjectRoot is supplied via --param ProjectRoot=... at create time.
+mounts:
+  - location: "{{.Param.ProjectRoot}}"
+    mountPoint: "/ceph-lab"
+    writable: true
+
+# vzNAT: outbound internet for apt/helm pulls.
+# ceph-lab: socket_vmnet host-only network (192.168.56.0/24), static IP below.
+networks:
+  - vzNAT: true
+  - lima: "ceph-lab"
+    interface: "eth1"
+
+# Required parameter — must be passed via --param at create time.
+param:
+  ProjectRoot: ""
+
+# ---------------------------------------------------------------------------
+# Provision: three steps run during cloud-init (idempotent; safe to re-run).
+#
+# Step 1 — netplan:   static IP; runs first and fast on every boot.
+# Step 2 — common.sh: kernel modules, sysctl, packages, shell ergonomics.
+# Step 3 — control-plane.sh: k3s server, Helm, Cilium, node-token publish.
+#
+# Steps 2 and 3 guard against re-running via sentinel files, so a
+# `limactl stop / start` cycle does not re-provision a live cluster.
+#
+# virtiofs mount is async at boot — step 2 polls for provision.env before
+# proceeding (up to 60 s, typically < 5 s).
+# ---------------------------------------------------------------------------
+
+provision:
+  # Step 1: Static IP — always runs; fast and safe to repeat.
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -e
+      cat > /etc/netplan/99-ceph-lab-static.yaml << 'NETPLAN'
+      network:
+        version: 2
+        ethernets:
+          eth1:
+            dhcp4: false
+            addresses:
+              - 192.168.56.50/24
+          lima0:
+            dhcp4: true
+            dhcp4-overrides:
+              use-routes: false
+      NETPLAN
+      chmod 600 /etc/netplan/99-ceph-lab-static.yaml
+      netplan apply || true
+      echo "[Lima] Static IP 192.168.56.50 on eth1; lima0 routes suppressed"
+
+  # Step 2: Wait for virtiofs, then run common.sh.
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -e
+      for i in $(seq 1 60); do
+        [ -f /ceph-lab/provisioning/provision.env ] && break
+        echo "[wait-virtiofs] ${i}/60..."
+        sleep 1
+      done
+      [ -f /ceph-lab/provisioning/provision.env ] \
+        || { echo "[ERROR] /ceph-lab not mounted after 60s"; exit 1; }
+      set -a
+      source /ceph-lab/provisioning/provision.env
+      [ -f /ceph-lab/.env ] && source /ceph-lab/.env || true
+      set +a
+      bash /ceph-lab/provisioning/scripts/common.sh
+
+  # Step 3: Install k3s + Helm + Cilium, publish node-token.
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -e
+      set -a
+      source /ceph-lab/provisioning/provision.env
+      [ -f /ceph-lab/.env ] && source /ceph-lab/.env || true
+      set +a
+      bash /ceph-lab/provisioning/scripts/control-plane.sh
+
+# Probe: limactl start blocks until the k3s API server is responding.
+# This replaces the explicit `kubectl wait --for=condition=Ready` in lima-up.sh.
+probes:
+  - mode: readiness
+    description: k3s API server responding
+    script: |
+      #!/bin/bash
+      sudo kubectl --kubeconfig /root/.kube/config get nodes &>/dev/null
+    hint: |
+      k3s control plane is not ready yet.
+      Check: limactl shell ceph-control -- sudo journalctl -u k3s -f

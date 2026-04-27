@@ -1,0 +1,143 @@
+# Lima VM definition — ceph-node (k3s agent + Ceph OSD node)
+#
+# Lima v2.0+ native: no sed substitution needed.
+#
+# Usage (handled automatically by lima-up.sh, one call per node):
+#   limactl create -y --name=ceph-node-1 \
+#     --set '.param.NodeIP = "192.168.56.61"' \
+#     --set '.param.ProjectRoot = "/abs/path/to/ceph-lab"' \
+#     --set '.additionalDisks[0].name = "ceph-node-1-rancher"' \
+#     --set '.additionalDisks[1].name = "ceph-node-1-osd-1"' \
+#     --set '.additionalDisks[2].name = "ceph-node-1-osd-2"' \
+#     provisioning/lima/ceph-node.yaml
+#   limactl start -y --timeout 30m ceph-node-1
+#
+# {{.Name}} expands to the instance name supplied via --name.
+# {{.Param.NodeIP}} expands to the static IP supplied via --param.
+
+minimumLimaVersion: "2.0.0"
+vmType: "vz"
+os: "Linux"
+# arch omitted — Lima defaults to the host architecture
+
+cpus: 3
+memory: "8GiB"
+disk: "40GiB"
+
+# k3s ships its own containerd.
+containerd:
+  system: false
+  user: false
+
+images:
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-\
+      server-cloudimg-arm64.img"
+    arch: "aarch64"
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-\
+      server-cloudimg-amd64.img"
+    arch: "x86_64"
+
+# Three additional block devices per worker:
+#   <name>-rancher — k3s data dir (20 GiB, formatted ext4 by common.sh)
+#   <name>-osd-1   — Ceph OSD disk 1 (10 GiB, raw — Rook auto-claims)
+#   <name>-osd-2   — Ceph OSD disk 2 (10 GiB, raw — Rook auto-claims)
+#
+# Placeholder names below are overridden by --set in lima-up.sh at create time.
+# (Lima validates disk names against a strict regex before template expansion,
+# so {{.Name}} cannot be used here directly.)
+# All disks must be pre-created with `limactl disk create` before starting.
+additionalDisks:
+  - name: "node-rancher"
+    size: "20GiB"
+  - name: "node-osd-1"
+    size: "10GiB"
+  - name: "node-osd-2"
+    size: "10GiB"
+
+mounts:
+  - location: "{{.Param.ProjectRoot}}"
+    mountPoint: "/ceph-lab"
+    writable: true
+
+networks:
+  - vzNAT: true
+  - lima: "ceph-lab"
+    interface: "eth1"
+
+# Required parameters — must be passed via --param at create time.
+param:
+  NodeIP: ""
+  ProjectRoot: ""
+
+# ---------------------------------------------------------------------------
+# Provision: three steps (idempotent; safe to re-run on restart).
+#
+# Step 1 — netplan:  static IP from {{.Param.NodeIP}}; fast on every boot.
+# Step 2 — common.sh: kernel modules, sysctl, packages, /etc/hosts.
+# Step 3 — node.sh:  wait for node-token, join k3s cluster.
+#
+# virtiofs is async — step 2 polls for provision.env before proceeding.
+# ---------------------------------------------------------------------------
+
+provision:
+  # Step 1: Static IP — always runs; fast and safe to repeat.
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -e
+      cat > /etc/netplan/99-ceph-lab-static.yaml << 'NETPLAN'
+      network:
+        version: 2
+        ethernets:
+          eth1:
+            dhcp4: false
+            addresses:
+              - {{.Param.NodeIP}}/24
+          lima0:
+            dhcp4: true
+            dhcp4-overrides:
+              use-routes: false
+      NETPLAN
+      chmod 600 /etc/netplan/99-ceph-lab-static.yaml
+      netplan apply || true
+      echo "[Lima] Static IP {{.Param.NodeIP}} on eth1; lima0 routes suppressed"
+
+  # Step 2: Wait for virtiofs, then run common.sh.
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -e
+      for i in $(seq 1 60); do
+        [ -f /ceph-lab/provisioning/provision.env ] && break
+        echo "[wait-virtiofs] ${i}/60..."
+        sleep 1
+      done
+      [ -f /ceph-lab/provisioning/provision.env ] \
+        || { echo "[ERROR] /ceph-lab not mounted after 60s"; exit 1; }
+      set -a
+      source /ceph-lab/provisioning/provision.env
+      [ -f /ceph-lab/.env ] && source /ceph-lab/.env || true
+      set +a
+      bash /ceph-lab/provisioning/scripts/common.sh
+
+  # Step 3: Wait for node-token, join k3s cluster.
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -e
+      set -a
+      source /ceph-lab/provisioning/provision.env
+      [ -f /ceph-lab/.env ] && source /ceph-lab/.env || true
+      set +a
+      bash /ceph-lab/provisioning/scripts/node.sh
+
+# Probe: limactl start blocks until this node has joined the cluster.
+probes:
+  - mode: readiness
+    description: k3s-agent joined cluster
+    script: |
+      #!/bin/bash
+      sudo systemctl is-active --quiet k3s-agent
+    hint: |
+      k3s agent has not joined the cluster yet.
+      Check: limactl shell <node-name> -- sudo journalctl -u k3s-agent -f

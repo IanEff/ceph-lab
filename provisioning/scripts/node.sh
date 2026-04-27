@@ -3,6 +3,13 @@
 # Joins a worker node to the k3s cluster.
 set -euo pipefail
 
+# Idempotency guard — Lima re-runs provision scripts on every boot.
+# Skip if already joined (destroy + recreate resets this).
+if [ -f /etc/ceph-lab-node.done ]; then
+    echo "[node.sh] Already provisioned, skipping."
+    exit 0
+fi
+
 CONTROL_PLANE_IP="${SANDBOX_CONTROL_PLANE_IP:-192.168.56.50}"
 K3S_CHANNEL="${SANDBOX_K3S_CHANNEL:-v1.33}"
 
@@ -23,7 +30,6 @@ done
 K3S_TOKEN=$(cat /ceph-lab/provisioning/node-token)
 
 echo "[ceph-lab worker] Joining cluster at ${CONTROL_PLANE_IP}..."
-# Run synchronously — Lima waits for kubelet.conf via a probe.
 curl -sfL https://get.k3s.io | \
     INSTALL_K3S_CHANNEL="${K3S_CHANNEL}" \
     K3S_URL="https://${CONTROL_PLANE_IP}:6443" \
@@ -31,4 +37,8 @@ curl -sfL https://get.k3s.io | \
     INSTALL_K3S_EXEC="agent --node-ip=${NODE_IP}" \
     sh -
 
+echo "[ceph-lab worker] Waiting for k3s-agent service to become active..."
+until systemctl is-active --quiet k3s-agent; do sleep 3; done
+
+touch /etc/ceph-lab-node.done
 echo "✓ node.sh complete — k3s-agent joined cluster"

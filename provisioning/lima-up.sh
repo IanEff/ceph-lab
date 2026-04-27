@@ -4,9 +4,11 @@
 #
 # Sequence:
 #   1. Preflight  — check prereqs and .env before touching any VMs
-#   2. VMs        — ceph-control (k3s + Cilium), then ceph-node-{1..N} in parallel
-#   3. Post-up    — merge kubeconfig + SSH, configure dnsmasq
-#   4. ArgoCD     — bootstrap from the Mac host once the full cluster is Ready
+#   2. Disks      — pre-create all Lima disks (idempotent)
+#   3. VMs        — all four VMs started in parallel; Lima runs provision
+#                   scripts internally and blocks until probes pass
+#   4. Post-up    — merge kubeconfig + SSH, configure dnsmasq
+#   5. ArgoCD     — bootstrap from the Mac host once the full cluster is Ready
 #
 # Usage:
 #   make up
@@ -80,70 +82,35 @@ ensure_disk() {
     fi
 }
 
-render_template() {
-    local tpl="$1" node_name="${2:-}" node_ip="${3:-}" node_num="${4:-}"
-    local out
-    out="$(mktemp)"
-    sed \
-        -e "s|__CEPH_LAB_ROOT__|${PROJECT_ROOT}|g" \
-        -e "s|__NODE_NAME__|${node_name}|g" \
-        -e "s|__NODE_IP__|${node_ip}|g" \
-        -e "s|__NODE_NUM__|${node_num}|g" \
-        "${tpl}" > "${out}"
-    echo "${out}"
-}
-
-run_on() {
-    local vm="$1" script="$2"
-    info "  [${vm}] running ${script}..."
-    limactl shell "${vm}" -- sudo bash -c "
-set -a
-source /ceph-lab/provisioning/provision.env
-[ -f /ceph-lab/.env ] && source /ceph-lab/.env
-set +a
-bash /ceph-lab/provisioning/scripts/${script}
-"
-}
-
 # ── Start control plane ───────────────────────────────────────────────────────
-step "Rendering ceph-control Lima YAML..."
-CP_YAML="$(render_template "${SCRIPT_DIR}/lima/ceph-control.yaml.tpl")"
+step "Ensuring ceph-control disks exist..."
+ensure_disk "ceph-control-rancher" "20GiB"
 
 # Remove stale node-token — workers poll for this file and an old one would
 # cause them to try to join a dead cluster.
 rm -f "${SCRIPT_DIR}/node-token"
 
-ensure_disk "ceph-control-rancher" "20GiB"
-
 CP_STATUS="$(vm_status ceph-control)"
-CP_STARTED=false
 case "${CP_STATUS}" in
     "")
-        step "Creating ceph-control instance..."
-        limactl create -y --name=ceph-control "${CP_YAML}"
-        rm -f "${CP_YAML}"
-        step "Starting ceph-control VM (netplan only — returns in ~20s)..."
-        limactl start -y --timeout 5m ceph-control
-        CP_STARTED=true
+        step "Creating ceph-control (baking in params)..."
+        limactl create -y --name=ceph-control \
+            --set ".param.ProjectRoot = \"${PROJECT_ROOT}\"" \
+            "${SCRIPT_DIR}/lima/ceph-control.yaml"
+        step "Starting ceph-control in background (provision runs inside Lima)..."
+        limactl start -y --timeout 35m ceph-control &
+        CP_PID=$!
         ;;
     "Running")
-        warn "ceph-control is already running — skipping start."
-        rm -f "${CP_YAML}"
+        warn "ceph-control is already running — skipping."
+        CP_PID=""
         ;;
     *)
-        warn "ceph-control exists (${CP_STATUS}) — starting without re-creating."
-        rm -f "${CP_YAML}"
-        limactl start -y --timeout 5m ceph-control
-        CP_STARTED=true
+        warn "ceph-control exists (${CP_STATUS}) — starting."
+        limactl start -y --timeout 35m ceph-control &
+        CP_PID=$!
         ;;
 esac
-
-if [ "${CP_STARTED}" = "true" ]; then
-    step "Provisioning ceph-control (common.sh + control-plane.sh)..."
-    run_on ceph-control common.sh
-    run_on ceph-control control-plane.sh
-    info "ceph-control provisioned."
-fi
 
 # ── Start worker nodes (in parallel) ─────────────────────────────────────────
 WORKER_PIDS=()
@@ -159,42 +126,40 @@ for i in $(seq 1 "${NUM_NODES}"); do
     W_STATUS="$(vm_status "${NODE_NAME}")"
     case "${W_STATUS}" in
         "")
-            step "Rendering worker YAML for ${NODE_NAME} (${NODE_IP})..."
-            W_YAML="$(render_template \
-                "${SCRIPT_DIR}/lima/ceph-node.yaml.tpl" \
-                "${NODE_NAME}" "${NODE_IP}" "${i}")"
-            step "Creating ${NODE_NAME} instance..."
-            limactl create -y --name="${NODE_NAME}" "${W_YAML}"
-            rm -f "${W_YAML}"
-            step "Scheduling ${NODE_NAME} start+provision in background..."
-            (
-                limactl start -y --timeout 5m "${NODE_NAME}"
-                run_on "${NODE_NAME}" common.sh
-                run_on "${NODE_NAME}" node.sh
-            ) &
+            step "Creating ${NODE_NAME} (baking in params: NodeIP=${NODE_IP})..."
+            limactl create -y --name="${NODE_NAME}" \
+                --set ".param.NodeIP = \"${NODE_IP}\"" \
+                --set ".param.ProjectRoot = \"${PROJECT_ROOT}\"" \
+                --set ".additionalDisks[0].name = \"${NODE_NAME}-rancher\"" \
+                --set ".additionalDisks[1].name = \"${NODE_NAME}-osd-1\"" \
+                --set ".additionalDisks[2].name = \"${NODE_NAME}-osd-2\"" \
+                "${SCRIPT_DIR}/lima/ceph-node.yaml"
+            step "Starting ${NODE_NAME} in background..."
+            limactl start -y --timeout 30m "${NODE_NAME}" &
             WORKER_PIDS+=($!)
             ;;
         "Running")
             warn "${NODE_NAME} is already running — skipping."
             ;;
         *)
-            warn "${NODE_NAME} exists (${W_STATUS}) — starting and provisioning."
-            (
-                limactl start -y --timeout 5m "${NODE_NAME}"
-                run_on "${NODE_NAME}" common.sh
-                run_on "${NODE_NAME}" node.sh
-            ) &
+            warn "${NODE_NAME} exists (${W_STATUS}) — starting."
+            limactl start -y --timeout 30m "${NODE_NAME}" &
             WORKER_PIDS+=($!)
             ;;
     esac
 done
 
-if [ "${#WORKER_PIDS[@]}" -gt 0 ]; then
-    step "Waiting for ${#WORKER_PIDS[@]} worker(s) to finish joining the cluster..."
-    for pid in "${WORKER_PIDS[@]}"; do
-        wait "${pid}" || error "A worker provisioning step failed (pid ${pid}). Check: limactl list"
+# ── Wait for all VMs ──────────────────────────────────────────────────────────
+ALL_PIDS=()
+[ -n "${CP_PID:-}" ] && ALL_PIDS+=("${CP_PID}")
+ALL_PIDS+=("${WORKER_PIDS[@]}")
+
+if [ "${#ALL_PIDS[@]}" -gt 0 ]; then
+    step "Waiting for ${#ALL_PIDS[@]} VM(s) to finish provisioning (probes included)..."
+    for pid in "${ALL_PIDS[@]}"; do
+        wait "${pid}" || error "A VM provisioning step failed (pid ${pid}). Check: limactl list"
     done
-    info "All workers are up."
+    info "All VMs are up and probes passed."
 fi
 
 # ── Post-up: kubeconfig + SSH aliases ────────────────────────────────────────
@@ -208,13 +173,6 @@ if [ "${CONFIGURE_DNSMASQ}" = "1" ]; then
     export SANDBOX_GATEWAY_LB_IP="${GATEWAY_LB_IP}"
     bash "${PROJECT_ROOT}/provisioning/scripts/dnsmasq_setup.sh"
 fi
-
-# ── Wait for all nodes Ready ──────────────────────────────────────────────────
-# Workers have joined (probe passed) but may still be initialising kubelet.
-step "Waiting for all nodes to reach Ready..."
-limactl shell ceph-control -- \
-    sudo kubectl --kubeconfig /root/.kube/config \
-    wait --for=condition=Ready node --all --timeout=5m
 
 # ── ArgoCD bootstrap ──────────────────────────────────────────────────────────
 # Runs from the Mac host via limactl shell — no Lima provision timeout pressure,

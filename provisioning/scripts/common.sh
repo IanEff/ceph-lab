@@ -4,6 +4,13 @@
 # Sets up kernel modules, sysctl, swap, base packages, and shell ergonomics.
 set -e
 
+# Idempotency guard — Lima re-runs provision scripts on every boot.
+# Skip if already provisioned (destroy + recreate resets this).
+if [ -f /etc/ceph-lab-common.done ]; then
+    echo "[common.sh] Already provisioned, skipping."
+    exit 0
+fi
+
 echo "══════════════════════════════════════════"
 echo "  ceph-lab provisioning — common baseline  "
 echo "══════════════════════════════════════════"
@@ -201,4 +208,5 @@ chown "${LAB_USER}:${LAB_USER}" \
     "${USER_HOME}/.tmux.conf" \
     "${USER_HOME}/.bashrc"
 
+touch /etc/ceph-lab-common.done
 echo "✓ common.sh complete"

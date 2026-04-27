@@ -3,6 +3,13 @@
 # Installs k3s server, Helm, and Cilium CNI on the control plane node.
 set -euo pipefail
 
+# Idempotency guard — Lima re-runs provision scripts on every boot.
+# Skip if already provisioned (destroy + recreate resets this).
+if [ -f /etc/ceph-lab-control-plane.done ]; then
+    echo "[control-plane.sh] Already provisioned, skipping."
+    exit 0
+fi
+
 CONTROL_PLANE_IP="${SANDBOX_CONTROL_PLANE_IP:-192.168.56.50}"
 K3S_CHANNEL="${SANDBOX_K3S_CHANNEL:-v1.33}"
 CILIUM_VERSION="${CILIUM_VERSION:-1.19.3}"
@@ -85,8 +92,14 @@ done
 echo "[7] Install Cilium CNI"
 bash /ceph-lab/provisioning/scripts/install_cilium.sh
 
+echo "[7b] Wait for API server after Cilium install"
+until kubectl --kubeconfig /root/.kube/config get nodes &>/dev/null; do
+    sleep 3
+done
+
 echo "[8] Publish join token for worker nodes"
 until [ -f /var/lib/rancher/k3s/server/node-token ]; do sleep 1; done
 install -m 644 /var/lib/rancher/k3s/server/node-token /ceph-lab/provisioning/node-token
 
+touch /etc/ceph-lab-control-plane.done
 echo "✓ control-plane.sh complete — workers can now join"
