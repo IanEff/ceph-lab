@@ -149,7 +149,7 @@ Rook operator and rook-cluster prune/selfHeal settings are intentional — they 
 ## Critical gotchas
 
 1. **`/dev/vdb` is NOT an OSD** — it's the k3s data disk (Lima virtio-blk). `deviceFilter: "^vd[cd]"` in `cephcluster.yaml` targets only `vdc`/`vdd`. Never include `vdb`.
-2. **OSD disks must stay raw** — pre-formatting any block device breaks Rook auto-discovery. OSD disks appear as `/dev/vdc` and `/dev/vdd` (Lima virtio-blk), pre-created with `limactl disk create`.
+2. **OSD disks must stay raw** — pre-formatting any block device breaks Rook auto-discovery. OSD disks appear as `/dev/vdc` and `/dev/vdd` (Lima virtio-blk), pre-created with `limactl disk create`. **Lima auto-formats named disks by default** — `format: false` must be set on every OSD disk entry in `ceph-node.yaml`, otherwise Lima ext4-formats and mounts them at boot, causing Rook to skip them with `skipping device "vdcX" with mountpoint`.
 3. **Gateway API manifests must include API-defaulted fields** — The admission webhook injects `group: ""`, `kind: Service`, `weight: 1` into `backendRefs` and `matches` into HTTPRoute rules. Omitting them causes permanent ArgoCD OutOfSync loops. See `docs/gitops-argocd-lessons.md` §3.
 4. **`CephFilesystemSubVolumeGroup` is required** (Rook ≥ v1.17) — without it, CephFS dynamic provisioning silently fails. See `applications/rook/storage/filesystem.yaml`.
 5. **`preserve*OnDelete: true`** on `CephFilesystem` and `CephObjectStore` — protects data from accidental ArgoCD sync prunes.
