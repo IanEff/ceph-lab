@@ -7,7 +7,7 @@ bpf:
 
 datapathMode: netkit
 devices:
-  - enp+
+  - eth+
 
 loadBalancer:
   mode: snat
