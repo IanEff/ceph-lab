@@ -39,8 +39,8 @@ images:
 
 # Three additional block devices per worker:
 #   <name>-rancher — k3s data dir (20 GiB, formatted ext4 by common.sh)
-#   <name>-osd-1   — Ceph OSD disk 1 (10 GiB, raw — Rook auto-claims)
-#   <name>-osd-2   — Ceph OSD disk 2 (10 GiB, raw — Rook auto-claims)
+#   <name>-osd-1   — Ceph OSD disk 1 (5 GiB, raw — Rook auto-claims)
+#   <name>-osd-2   — Ceph OSD disk 2 (5 GiB, raw — Rook auto-claims)
 #
 # Placeholder names below are overridden by --set in lima-up.sh at create time.
 # (Lima validates disk names against a strict regex before template expansion,
@@ -50,9 +50,9 @@ additionalDisks:
   - name: "node-rancher"
     size: "20GiB"
   - name: "node-osd-1"
-    size: "10GiB"
+    size: "5GiB"
   - name: "node-osd-2"
-    size: "10GiB"
+    size: "5GiB"
 
 mounts:
   - location: "{{.Param.ProjectRoot}}"

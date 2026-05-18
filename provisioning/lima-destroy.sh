@@ -40,26 +40,55 @@ if [ "${FORCE}" -eq 0 ]; then
     [ "${confirm}" = "yes" ] || { info "Aborted."; exit 0; }
 fi
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+# Idempotent delete: succeed if the target is already gone, fail loudly on any
+# other error.  Previous form (`|| true`) swallowed real failures and left the
+# script reporting "Cluster destroyed" on a half-cleaned state — which then
+# poisoned the next `make up`.
+vm_exists()   { limactl list --quiet 2>/dev/null | grep -qx "$1"; }
+disk_exists() { limactl disk list 2>/dev/null | awk 'NR>1 {print $1}' | grep -qx "$1"; }
+
+delete_vm() {
+    local name="$1"
+    if ! vm_exists "${name}"; then
+        info "VM ${name} already absent."
+        return 0
+    fi
+    step "Deleting VM ${name}..."
+    if ! limactl delete --force "${name}"; then
+        error "Failed to delete VM ${name}.  Inspect: limactl list"
+    fi
+    vm_exists "${name}" && error "VM ${name} still present after delete."
+    return 0
+}
+
+delete_disk() {
+    local name="$1"
+    if ! disk_exists "${name}"; then
+        info "Disk ${name} already absent."
+        return 0
+    fi
+    step "Deleting disk ${name}..."
+    if ! limactl disk delete "${name}"; then
+        error "Failed to delete disk ${name}.  Inspect: limactl disk list"
+    fi
+    disk_exists "${name}" && error "Disk ${name} still present after delete."
+    return 0
+}
+
 # ── Delete VMs ────────────────────────────────────────────────────────────────
 for i in $(seq "${NUM_NODES}" -1 1); do
-    NODE_NAME="ceph-node-${i}"
-    step "Deleting ${NODE_NAME}..."
-    limactl delete --force "${NODE_NAME}" 2>/dev/null || true
+    delete_vm "ceph-node-${i}"
 done
-
-step "Deleting ceph-control..."
-limactl delete --force ceph-control 2>/dev/null || true
+delete_vm "ceph-control"
 
 # ── Delete named disks ────────────────────────────────────────────────────────
-step "Deleting ceph-control-rancher disk..."
-limactl disk delete ceph-control-rancher 2>/dev/null || true
-
+delete_disk "ceph-control-rancher"
 for i in $(seq 1 "${NUM_NODES}"); do
     NODE_NAME="ceph-node-${i}"
-    step "Deleting ${NODE_NAME} disks..."
-    limactl disk delete "${NODE_NAME}-rancher" 2>/dev/null || true
+    delete_disk "${NODE_NAME}-rancher"
     for d in $(seq 1 "${OSD_DISKS}"); do
-        limactl disk delete "${NODE_NAME}-osd-${d}" 2>/dev/null || true
+        delete_disk "${NODE_NAME}-osd-${d}"
     done
 done
 
@@ -73,7 +102,9 @@ python3 "${PROJECT_ROOT}/provisioning/scripts/manage_k8s_config.py" remove
 if [ "${CONFIGURE_DNSMASQ}" = "1" ]; then
     step "Removing dnsmasq config for *.${DNS_DOMAIN}..."
     export SANDBOX_DNS_DOMAIN="${DNS_DOMAIN}"
-    bash "${PROJECT_ROOT}/provisioning/scripts/dnsmasq_teardown.sh" 2>/dev/null || true
+    if ! bash "${PROJECT_ROOT}/provisioning/scripts/dnsmasq_teardown.sh"; then
+        error "dnsmasq teardown failed."
+    fi
 fi
 
 info "Cluster destroyed."

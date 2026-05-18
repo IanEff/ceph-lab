@@ -72,7 +72,7 @@ cluster-bootstrap/
   argocd/             # ArgoCD install patches (insecure mode, --enable-helm, resource limits)
   bootstrap/          # root-app.yaml — the seed Application that ArgoCD self-manages
 provisioning/
-  lima/               # Lima VM templates (ceph-control.yaml.tpl, ceph-node.yaml.tpl, networks.yaml)
+  lima/               # Lima VM definitions (ceph-control.yaml, ceph-node.yaml, networks.yaml)
   scripts/            # VM provisioning scripts + macOS host helpers
   provision.env       # Cluster topology defaults (committed; no secrets)
   lima-up.sh          # Start/provision all VMs
@@ -175,7 +175,7 @@ Rook operator and rook-cluster prune/selfHeal settings are intentional — they 
 | Node | IP | Role |
 |---|---|---|
 | `ceph-control` | `192.168.56.50` | k3s server, 2 vCPU / 6 GiB (Lima/vz) |
-| `ceph-node-{1,2,3}` | `192.168.56.{61,62,63}` | k3s agents + Ceph OSDs, 3 vCPU / 8 GiB + 2×10 GiB raw OSDs (Lima/vz) |
+| `ceph-node-{1,2,3}` | `192.168.56.{61,62,63}` | k3s agents + Ceph OSDs, 3 vCPU / 8 GiB + 2×5 GiB raw OSDs (Lima/vz) |
 | Cilium Gateway | `192.168.56.200` | L2 LB (pool `192.168.56.192/27`) |
 
 Hypervisor: **Lima** with `vmType: vz` (Apple Virtualization.framework) — native performance, no QEMU overhead.

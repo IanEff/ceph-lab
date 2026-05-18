@@ -120,8 +120,8 @@ for i in $(seq 1 "${NUM_NODES}"); do
     NODE_IP="192.168.56.$((NODE_IP_BASE + i))"
 
     ensure_disk "${NODE_NAME}-rancher" "20GiB"
-    ensure_disk "${NODE_NAME}-osd-1"   "10GiB"
-    ensure_disk "${NODE_NAME}-osd-2"   "10GiB"
+    ensure_disk "${NODE_NAME}-osd-1"   "5GiB"
+    ensure_disk "${NODE_NAME}-osd-2"   "5GiB"
 
     W_STATUS="$(vm_status "${NODE_NAME}")"
     case "${W_STATUS}" in

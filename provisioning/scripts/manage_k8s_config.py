@@ -313,6 +313,7 @@ def remove_kube_config() -> None:
         ["kubectl", "config", "delete-context", NEW_CONTEXT_NAME],
         ["kubectl", "config", "delete-context", NEW_CLUSTER_NAME],  # rogue duplicate from buggy run
         ["kubectl", "config", "delete-cluster", NEW_CLUSTER_NAME],
+        ["kubectl", "config", "delete-cluster", NEW_CONTEXT_NAME],  # legacy: older script versions named the cluster "ceph-lab"
         ["kubectl", "config", "delete-user", NEW_USER_NAME],
     ]
 
