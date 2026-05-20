@@ -1,27 +1,30 @@
-# one-time host prerequesites (lima, socket_vmnet, network config
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+# list available recipes
+default:
+    @just --list
+
+# one-time host prerequisites (Lima, socket_vmnet, network config)
 setup:
-    bash provisioning/lima-setup.sh
+    provisioning/lima-setup.sh
 
-# start the VMs and provision kubernetes
+# provision and start all VMs (~10–20 min first run)
 up:
-	bash provisioning/lima-up.sh
+    provisioning/lima-up.sh
 
-# stop the VMs and preserve state
+# stop VMs and preserve state
 down:
-	bash provisioning/lima-down.sh
+    provisioning/lima-down.sh
 
-# permanently delete VMs and disks
+# permanently delete all VMs and disks
+[confirm("Permanently delete all VMs and disks?")]
 destroy:
-	bash provisioning/lima-destroy.sh
-
-# permanently delete VMs and disks, forcefully
-destroy-force:
-	bash provisioning/lima-destroy.sh -f
+    provisioning/lima-destroy.sh -f
 
 # open a shell on ceph-control
 ssh:
-	limactl shell ceph-control
+    limactl shell ceph-control
 
-$ merge kubeconfig and SSH aliases after a restart
+# merge kubeconfig + SSH aliases after a restart
 kubeconfig:
-	python3 provisioning/scripts/manage_k8s_config.py add
+    python3 provisioning/scripts/manage_k8s_config.py add
