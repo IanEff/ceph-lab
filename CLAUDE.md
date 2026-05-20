@@ -170,6 +170,14 @@ Rook operator and rook-cluster prune/selfHeal settings are intentional — they 
 17. **Lima disks must be pre-created** — `limactl disk create` must run before `limactl start`. `lima-up.sh` handles this automatically; manual starts require running `ensure_disk` first.
 18. **`lima0` default route breaks pod egress** — Lima always adds a `lima0` management interface (192.168.105.0/24) whose DHCP installs a default route at metric 100, beating vzNAT's `eth0` at metric 200. Cilium BPF masquerade SNATs via `eth0`, so outbound pod packets leave on `lima0` with the wrong source IP and replies (e.g. from GitHub) never match the BPF conntrack table — ArgoCD can't clone repos. Fix: `dhcp4-overrides: {use-routes: false}` on `lima0` in netplan (already in both Lima templates).
 19. **Cilium IPAM CIDR must match at both install phases** — `install_cilium.sh` (Helm, runs at VM boot) and the GitOps kustomization (applied later by `install_argocd.sh`) are two separate Cilium installs. If `install_cilium.sh` omits `--set "ipam.operator.clusterPoolIPv4PodCIDRList={10.244.0.0/16}"`, the initial ConfigMap gets Helm's default `cluster-pool-ipv4-cidr: 10.0.0.0/8`. Agents initialize IPAM from that value, write `10.0.x.0/24` into CiliumNode specs, and stay stuck there — the later kustomize apply fixes the ConfigMap but doesn't trigger a DaemonSet rollout. Result: all cross-node pod traffic BPF-masquerades and breaks. Fix is already in `install_cilium.sh`. **`--cluster-pool-ipv4-cidr` is NOT a valid `cilium-agent` flag** (only valid for `cilium-operator`) — do not add it to the DaemonSet args.
+20. **Lima auto port-forwarding is pure noise here — disable it wholesale.** Lima's hostagent forwards every guest-bound port to host loopback by default, and since the v1.1 GRPC-forwarder default it forwards UDP too. On a busy k3s+Ceph guest that's hundreds of ephemeral `0.0.0.0:NNNNN → 127.0.0.1:NNNNN` lines, plus a dual-stack `0.0.0.0:111` / `[::]:111` rpcbind collision (`bind: address already in use`), drowning `ha.stdout.log`. **None of it is load-bearing**: all access is via the `ceph-lab` socket_vmnet net (192.168.56.0/24) + Cilium Gateway, and the kubeconfig targets `192.168.56.50:6443` directly — nothing routes over Lima loopback. Disable it in both `ceph-control.yaml` and `ceph-node.yaml` (SSH:22 is forwarded regardless):
+    ```yaml
+    portForwards:
+      - ignore: true
+        proto: any
+        guestIP: "0.0.0.0"
+    ```
+    `proto: any` + `guestIP: "0.0.0.0"` is the canonical disable-all incantation; the bare `ignore: true` form silently regressed in Lima 1.0.1 (#2901). If you ever need a loopback shortcut, list it *above* the ignore — first match wins. Grammar is undocumented except in `templates/default.yaml` comments and `pkg/limayaml/defaults.go`.
 
 ---
 

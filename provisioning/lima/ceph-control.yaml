@@ -54,6 +54,20 @@ networks:
   - lima: "ceph-lab"
     interface: "eth1"
 
+# Disable Lima's default auto-forwarding of every guest-bound port to host
+# loopback. None of it is load-bearing here: cluster access is via the
+# ceph-lab socket_vmnet net (192.168.56.0/24) + Cilium Gateway, and kubeconfig
+# targets 192.168.56.50:6443 directly — nothing routes over Lima loopback.
+# Without this, ha.stdout.log drowns in ephemeral UDP forwards (and we get a
+# dual-stack 0.0.0.0:111 / [::]:111 rpcbind collision). `proto: any` +
+# `guestIP: "0.0.0.0"` is the canonical disable-all incantation; the bare
+# `ignore: true` form silently regressed in Lima 1.0.1 (#2901). SSH:22 is
+# always forwarded regardless of this rule.
+portForwards:
+  - ignore: true
+    proto: any
+    guestIP: "0.0.0.0"
+
 # Required parameter — must be passed via --param at create time.
 param:
   ProjectRoot: ""
