@@ -23,6 +23,41 @@ echo "════════════════════════�
 LAB_USER="${LIMA_CIDATA_USER:-}"
 USER_HOME="${LIMA_CIDATA_HOME:-}"
 
+# ── Optional local pull-through cache (apt-cacher-ng + OCI registries) ──────
+# When SANDBOX_CACHE_ENABLED=1 and the cache host is reachable, point APT and
+# k3s/containerd at it. Cache misses fall through to the canonical registries;
+# cache hits make every reboot effectively free. Removed in cb37d8f and
+# restored here — its absence is what makes us hostage to flaky quay.io.
+SANDBOX_CACHE_ENABLED="${SANDBOX_CACHE_ENABLED:-0}"
+SANDBOX_CACHE_HOST="${SANDBOX_CACHE_HOST:-}"
+SANDBOX_CACHE_APT_PORT="${SANDBOX_CACHE_APT_PORT:-3142}"
+SANDBOX_CACHE_REGISTRY_DOCKERHUB_PORT="${SANDBOX_CACHE_REGISTRY_DOCKERHUB_PORT:-5001}"
+SANDBOX_CACHE_REGISTRY_K8S_PORT="${SANDBOX_CACHE_REGISTRY_K8S_PORT:-5002}"
+SANDBOX_CACHE_REGISTRY_GHCR_PORT="${SANDBOX_CACHE_REGISTRY_GHCR_PORT:-5003}"
+SANDBOX_CACHE_REGISTRY_QUAY_PORT="${SANDBOX_CACHE_REGISTRY_QUAY_PORT:-5004}"
+
+cache_tcp_check() {
+    local host="$1" port="$2"
+    [ -z "$host" ] && return 1
+    timeout 1 bash -c "</dev/tcp/${host}/${port}" >/dev/null 2>&1
+}
+
+maybe_configure_apt_cache() {
+    [ "$SANDBOX_CACHE_ENABLED" != "1" ] && return 0
+    local h="${SANDBOX_CACHE_HOST}"
+    [ -z "$h" ] && { echo "[CACHE] SANDBOX_CACHE_HOST empty; skipping APT cache."; return 0; }
+    if ! cache_tcp_check "$h" "$SANDBOX_CACHE_APT_PORT"; then
+        echo "[CACHE] APT cache not reachable at ${h}:${SANDBOX_CACHE_APT_PORT}; continuing without it."
+        return 0
+    fi
+    echo "[CACHE] Using APT proxy at ${h}:${SANDBOX_CACHE_APT_PORT}"
+    cat > /etc/apt/apt.conf.d/01sandbox-cache <<EOF
+Acquire::http::Proxy "http://${h}:${SANDBOX_CACHE_APT_PORT}";
+Acquire::http::Proxy::${h} "DIRECT";
+Acquire::https::Proxy "DIRECT";
+EOF
+}
+
 echo "[1] Disable swap"
 swapoff -a
 sed -i '/swap/d' /etc/fstab
@@ -35,6 +70,8 @@ DNS=8.8.8.8
 FallbackDNS=1.1.1.1
 EOF
 systemctl restart systemd-resolved
+
+maybe_configure_apt_cache
 
 echo "[3] Kernel modules for Kubernetes + Rook Ceph"
 cat > /etc/modules-load.d/k8s.conf <<EOF
@@ -56,23 +93,52 @@ net.ipv4.ip_forward                 = 1
 EOF
 sysctl --system >/dev/null
 
-echo "[4b] k3s containerd registry mirrors — failover for flaky quay.io/docker.io"
-# k3s reads this at start; configures containerd to try each endpoint in order.
-# Cilium images live primarily on quay.io but are mirrored to docker.io;
-# k3s's pause image lives on docker.io. Listing both as endpoints for each
-# means a TLS handshake timeout on one provider falls through to the other
-# instead of failing the whole install.
+echo "[4b] k3s containerd registry mirrors"
+# k3s reads /etc/rancher/k3s/registries.yaml at start; containerd tries each
+# endpoint in order.  Two layers:
+#   1. Local pull-through cache (when SANDBOX_CACHE_ENABLED=1 and reachable) —
+#      first endpoint per registry, makes repeat boots effectively free.
+#   2. Public canonical + cross-mirror — fallback when cache is off or down.
+#      Cilium images mirror to both quay.io and docker.io, so listing both
+#      per registry lets a TLS-handshake timeout on one fall through to the
+#      other instead of failing the whole install.
 mkdir -p /etc/rancher/k3s
-cat > /etc/rancher/k3s/registries.yaml <<'EOF'
+
+# Decide per-registry whether to prepend a cache endpoint.
+cache_endpoint() {  # $1=port → echoes "      - http://HOST:PORT\n" or empty
+    local port="$1"
+    [ "$SANDBOX_CACHE_ENABLED" = "1" ] && [ -n "$SANDBOX_CACHE_HOST" ] \
+        && cache_tcp_check "$SANDBOX_CACHE_HOST" "$port" \
+        && printf '      - "http://%s:%s"\n' "$SANDBOX_CACHE_HOST" "$port"
+}
+DOCKERHUB_CACHE=$(cache_endpoint "$SANDBOX_CACHE_REGISTRY_DOCKERHUB_PORT")
+K8S_CACHE=$(cache_endpoint "$SANDBOX_CACHE_REGISTRY_K8S_PORT")
+GHCR_CACHE=$(cache_endpoint "$SANDBOX_CACHE_REGISTRY_GHCR_PORT")
+QUAY_CACHE=$(cache_endpoint "$SANDBOX_CACHE_REGISTRY_QUAY_PORT")
+
+if [ -n "${DOCKERHUB_CACHE}${K8S_CACHE}${GHCR_CACHE}${QUAY_CACHE}" ]; then
+    echo "[CACHE] Pull-through cache reachable; prepending local mirror endpoints."
+fi
+
+cat > /etc/rancher/k3s/registries.yaml <<EOF
 mirrors:
-  quay.io:
-    endpoint:
-      - "https://quay.io"
-      - "https://registry-1.docker.io"
   docker.io:
     endpoint:
-      - "https://registry-1.docker.io"
+${DOCKERHUB_CACHE}      - "https://registry-1.docker.io"
       - "https://quay.io"
+  registry-1.docker.io:
+    endpoint:
+${DOCKERHUB_CACHE}      - "https://registry-1.docker.io"
+  registry.k8s.io:
+    endpoint:
+${K8S_CACHE}      - "https://registry.k8s.io"
+  ghcr.io:
+    endpoint:
+${GHCR_CACHE}      - "https://ghcr.io"
+  quay.io:
+    endpoint:
+${QUAY_CACHE}      - "https://quay.io"
+      - "https://registry-1.docker.io"
 EOF
 
 echo "[5] /etc/hosts — cluster node entries"
