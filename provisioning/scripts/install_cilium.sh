@@ -22,12 +22,14 @@ kubectl wait --for=condition=Established \
     crd/grpcroutes.gateway.networking.k8s.io \
     --timeout=60s
 
-echo "[cilium] Installing Cilium ${CILIUM_VERSION} via Helm"
-helm repo add cilium https://helm.cilium.io/ 2>/dev/null || true
-helm repo update cilium
+echo "[cilium] Installing Cilium ${CILIUM_VERSION} via Helm (local vendored chart)"
+# Use the chart vendored in the repo rather than `helm repo add ... helm.cilium.io`.
+# Removes a network dep at boot and locks the install to exactly the chart
+# ArgoCD will reconcile against later.
+CHART_DIR="/ceph-lab/applications/infrastructure/cilium/charts/cilium-${CILIUM_VERSION}/cilium"
+[ -d "${CHART_DIR}" ] || { echo "[ERROR] Vendored Cilium chart not found at ${CHART_DIR}"; exit 1; }
 
-helm upgrade --install cilium cilium/cilium \
-    --version "${CILIUM_VERSION}" \
+helm upgrade --install cilium "${CHART_DIR}" \
     --namespace kube-system \
     --set kubeProxyReplacement=true \
     --set k8sServiceHost="${CONTROL_PLANE_IP}" \
@@ -46,12 +48,12 @@ helm upgrade --install cilium cilium/cilium \
     --set hubble.relay.enabled=true \
     --set hubble.ui.enabled=true \
     --set "hubble.metrics.enabled={dns,drop,tcp,flow,icmp,httpV2:exemplars=true;labelsContext=source_ip\,source_namespace\,source_workload\,destination_ip\,destination_namespace\,destination_workload\,traffic_direction}" \
-    --wait --timeout 5m
+    --wait --timeout 10m
 
-echo "[cilium] Waiting for cilium pods to be ready..."
-# Cilium image pull alone can take 5+ minutes on a fresh ARM Mac VM; helm
-# --wait above only blocks on DaemonSet rollout-scheduled, not pod-ready.
-kubectl rollout status daemonset/cilium -n kube-system --timeout=10m
+# Trust helm --wait. The previous `kubectl rollout status` was a redundant
+# second check that just doubled our exposure to flaky image pulls. Workers
+# can already join (token published earlier); if Cilium is slow, they'll come
+# up NotReady and recover when the DaemonSet spreads.
 
 echo "[cilium] Installing Hubble CLI"
 ARCH=$(dpkg --print-architecture)

@@ -56,6 +56,25 @@ net.ipv4.ip_forward                 = 1
 EOF
 sysctl --system >/dev/null
 
+echo "[4b] k3s containerd registry mirrors — failover for flaky quay.io/docker.io"
+# k3s reads this at start; configures containerd to try each endpoint in order.
+# Cilium images live primarily on quay.io but are mirrored to docker.io;
+# k3s's pause image lives on docker.io. Listing both as endpoints for each
+# means a TLS handshake timeout on one provider falls through to the other
+# instead of failing the whole install.
+mkdir -p /etc/rancher/k3s
+cat > /etc/rancher/k3s/registries.yaml <<'EOF'
+mirrors:
+  quay.io:
+    endpoint:
+      - "https://quay.io"
+      - "https://registry-1.docker.io"
+  docker.io:
+    endpoint:
+      - "https://registry-1.docker.io"
+      - "https://quay.io"
+EOF
+
 echo "[5] /etc/hosts — cluster node entries"
 CONTROL_PLANE_IP="${SANDBOX_CONTROL_PLANE_IP:-192.168.56.50}"
 NODE_IP_BASE="${SANDBOX_CEPH_NODE_IP_BASE:-60}"
