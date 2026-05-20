@@ -56,8 +56,10 @@ kubectl rollout status daemonset/cilium -n kube-system --timeout=10m
 echo "[cilium] Installing Hubble CLI"
 ARCH=$(dpkg --print-architecture)
 HUBBLE_VERSION="v1.19.3"
-curl -fsSL -o /tmp/hubble.tar.gz \
-    "https://github.com/cilium/hubble/releases/download/${HUBBLE_VERSION}/hubble-linux-${ARCH}.tar.gz"
+curl --fail --show-error --silent --location \
+     --connect-timeout 15 --max-time 180 --retry 3 --retry-delay 5 \
+     -o /tmp/hubble.tar.gz \
+     "https://github.com/cilium/hubble/releases/download/${HUBBLE_VERSION}/hubble-linux-${ARCH}.tar.gz"
 tar -xzf /tmp/hubble.tar.gz -C /tmp hubble
 install -m 755 /tmp/hubble /usr/local/bin/hubble
 rm -f /tmp/hubble.tar.gz /tmp/hubble

@@ -19,23 +19,31 @@ NODE_IP=$(ip -4 addr show | grep '192\.168\.56\.' | awk '{print $2}' | cut -d/ -
 echo "[ceph-lab worker] Node IP = ${NODE_IP}"
 echo "[ceph-lab worker] Waiting for node-token from ceph-control..."
 
-for _i in $(seq 1 180); do
+# CP publishes the token right after the API server is up (well before
+# anything slow like Cilium install). 3 min is plenty; if it's not there by
+# then the CP itself is broken and there's no point waiting longer.
+for _i in $(seq 1 36); do
     [ -f /ceph-lab/provisioning/node-token ] && break
-    echo "  waiting for node-token (${_i}/180)..."
+    echo "  waiting for node-token (${_i}/36)..."
     sleep 5
 done
 [ -f /ceph-lab/provisioning/node-token ] \
-    || { echo "[ERROR] node-token not available after 15 min"; exit 1; }
+    || { echo "[ERROR] node-token not available after 3 min — CP is broken"; exit 1; }
 
 K3S_TOKEN=$(cat /ceph-lab/provisioning/node-token)
 
 echo "[ceph-lab worker] Joining cluster at ${CONTROL_PLANE_IP}..."
-curl -sfL https://get.k3s.io | \
+curl --fail --show-error --silent --location \
+     --connect-timeout 15 --max-time 30 --retry 3 --retry-delay 5 \
+     -o /tmp/k3s-install.sh https://get.k3s.io
+chmod +x /tmp/k3s-install.sh
+timeout 300 env \
     INSTALL_K3S_CHANNEL="${K3S_CHANNEL}" \
     K3S_URL="https://${CONTROL_PLANE_IP}:6443" \
     K3S_TOKEN="${K3S_TOKEN}" \
     INSTALL_K3S_EXEC="agent --node-ip=${NODE_IP}" \
-    sh -
+    /tmp/k3s-install.sh
+rm -f /tmp/k3s-install.sh
 
 echo "[ceph-lab worker] Waiting for k3s-agent service to become active..."
 until systemctl is-active --quiet k3s-agent; do sleep 3; done

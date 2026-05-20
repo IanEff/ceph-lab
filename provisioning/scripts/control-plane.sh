@@ -26,9 +26,17 @@ echo "  ceph-lab — control-plane setup           "
 echo "══════════════════════════════════════════"
 
 echo "[1] Install Helm"
-curl -fsSL -o /tmp/get_helm.sh \
-    https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-chmod 700 /tmp/get_helm.sh && /tmp/get_helm.sh && rm /tmp/get_helm.sh
+# Skip get-helm-3 entirely — its inner curl has no timeout and hangs forever
+# on slow vzNAT. Download the binary ourselves with hard fail-fast timeouts.
+HELM_VERSION="v3.16.3"
+ARCH=$(dpkg --print-architecture)
+curl --fail --show-error --silent --location \
+     --connect-timeout 15 --max-time 180 --retry 3 --retry-delay 5 \
+     -o /tmp/helm.tar.gz \
+     "https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz"
+tar -xzf /tmp/helm.tar.gz -C /tmp
+install -m 755 "/tmp/linux-${ARCH}/helm" /usr/local/bin/helm
+rm -rf /tmp/helm.tar.gz "/tmp/linux-${ARCH}"
 
 echo "[2] Create swap file for control-plane memory headroom"
 # common.sh disables system swap; re-enable a dedicated swap file here so the
@@ -64,7 +72,14 @@ kubelet-arg:
 EOF
 
 echo "[4] Install k3s server (channel: ${K3S_CHANNEL})"
-curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL="${K3S_CHANNEL}" sh -
+# Cap the whole install at 5 min so a hung download fails loudly instead of
+# silently consuming the Lima boot timeout.
+curl --fail --show-error --silent --location \
+     --connect-timeout 15 --max-time 30 --retry 3 --retry-delay 5 \
+     -o /tmp/k3s-install.sh https://get.k3s.io
+chmod +x /tmp/k3s-install.sh
+timeout 300 env INSTALL_K3S_CHANNEL="${K3S_CHANNEL}" /tmp/k3s-install.sh
+rm -f /tmp/k3s-install.sh
 
 echo "[5] Wait for API server to respond"
 until kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get nodes &>/dev/null; do
