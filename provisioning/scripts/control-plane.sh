@@ -89,17 +89,21 @@ until kubectl --kubeconfig /root/.kube/config get nodes &>/dev/null; do
     sleep 3
 done
 
-echo "[7] Install Cilium CNI"
+# Publish the join token BEFORE the (slow) Cilium install so workers can begin
+# joining in parallel. If Cilium install fails or pulls images slowly, workers
+# still get the token and form the cluster (they'll be NotReady until Cilium
+# spreads, which is fine — kubelets and k3s-agent come up regardless).
+echo "[7] Publish join token for worker nodes"
+until [ -f /var/lib/rancher/k3s/server/node-token ]; do sleep 1; done
+install -m 644 /var/lib/rancher/k3s/server/node-token /ceph-lab/provisioning/node-token
+
+echo "[8] Install Cilium CNI"
 bash /ceph-lab/provisioning/scripts/install_cilium.sh
 
-echo "[7b] Wait for API server after Cilium install"
+echo "[8b] Wait for API server after Cilium install"
 until kubectl --kubeconfig /root/.kube/config get nodes &>/dev/null; do
     sleep 3
 done
-
-echo "[8] Publish join token for worker nodes"
-until [ -f /var/lib/rancher/k3s/server/node-token ]; do sleep 1; done
-install -m 644 /var/lib/rancher/k3s/server/node-token /ceph-lab/provisioning/node-token
 
 touch /etc/ceph-lab-control-plane.done
 echo "✓ control-plane.sh complete — workers can now join"

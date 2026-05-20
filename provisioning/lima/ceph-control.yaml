@@ -124,14 +124,18 @@ provision:
       set +a
       bash /ceph-lab/provisioning/scripts/control-plane.sh
 
-# Probe: limactl start blocks until the k3s API server is responding.
-# This replaces the explicit `kubectl wait --for=condition=Ready` in lima-up.sh.
+# Probe: limactl start blocks until control-plane.sh has fully completed.
+# Checking only `kubectl get nodes` is too weak — k3s comes up at step 4 of
+# control-plane.sh, so the probe would pass even if a later step (e.g. Cilium
+# install) failed and left the cluster half-provisioned with no published
+# node-token. The sentinel file is the only "all steps succeeded" signal.
 probes:
   - mode: readiness
-    description: k3s API server responding
+    description: control-plane.sh finished successfully
     script: |
       #!/bin/bash
-      sudo kubectl --kubeconfig /root/.kube/config get nodes &>/dev/null
+      [ -f /etc/ceph-lab-control-plane.done ]
     hint: |
-      k3s control plane is not ready yet.
+      control-plane.sh has not finished. Inspect the last failed step:
+      Check: limactl shell ceph-control -- sudo tail -100 /var/log/cloud-init-output.log
       Check: limactl shell ceph-control -- sudo journalctl -u k3s -f

@@ -49,7 +49,9 @@ helm upgrade --install cilium cilium/cilium \
     --wait --timeout 5m
 
 echo "[cilium] Waiting for cilium pods to be ready..."
-kubectl rollout status daemonset/cilium -n kube-system --timeout=3m
+# Cilium image pull alone can take 5+ minutes on a fresh ARM Mac VM; helm
+# --wait above only blocks on DaemonSet rollout-scheduled, not pod-ready.
+kubectl rollout status daemonset/cilium -n kube-system --timeout=10m
 
 echo "[cilium] Installing Hubble CLI"
 ARCH=$(dpkg --print-architecture)
