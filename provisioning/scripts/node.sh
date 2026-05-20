@@ -19,13 +19,13 @@ NODE_IP=$(ip -4 addr show | grep '192\.168\.56\.' | awk '{print $2}' | cut -d/ -
 echo "[ceph-lab worker] Node IP = ${NODE_IP}"
 echo "[ceph-lab worker] Waiting for node-token from ceph-control..."
 
-for _i in $(seq 1 60); do
+for _i in $(seq 1 180); do
     [ -f /ceph-lab/provisioning/node-token ] && break
-    echo "  waiting for node-token (${_i}/60)..."
+    echo "  waiting for node-token (${_i}/180)..."
     sleep 5
 done
 [ -f /ceph-lab/provisioning/node-token ] \
-    || { echo "[ERROR] node-token not available after 5 min"; exit 1; }
+    || { echo "[ERROR] node-token not available after 15 min"; exit 1; }
 
 K3S_TOKEN=$(cat /ceph-lab/provisioning/node-token)
 
