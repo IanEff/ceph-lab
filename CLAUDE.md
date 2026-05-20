@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A fully-gitopsed **Rook/Ceph playground on k3s**, managed end-to-end by ArgoCD. `make up` provisions 4 Lima VMs; `install_argocd.sh` bootstraps the entire software stack from git — no manual `kubectl apply` needed.
+A fully-gitopsed **Rook/Ceph playground on k3s**, managed end-to-end by ArgoCD. `just up` provisions 4 Lima VMs; `install_argocd.sh` bootstraps the entire software stack from git — no manual `kubectl apply` needed.
 
 ---
 
@@ -12,16 +12,16 @@ A fully-gitopsed **Rook/Ceph playground on k3s**, managed end-to-end by ArgoCD. 
 
 ```bash
 # One-time host setup (Lima, socket_vmnet, network config)
-make setup
+just setup
 
 # Boot cluster (~10–20 min first run)
-make up
+just up
 
 # Merge kubeconfig + SSH config onto Mac (re-run after restarts)
-make kubeconfig
+just kubeconfig
 
 # Open a shell on ceph-control
-make ssh
+just ssh
 
 # Bootstrap ArgoCD manually (from inside ceph-control, or if SANDBOX_INSTALL_ARGOCD=0)
 bash /ceph-lab/provisioning/scripts/install_argocd.sh
@@ -36,10 +36,13 @@ kubectl exec -it -n rook-ceph deploy/rook-ceph-tools -- ceph status
 bash provisioning/scripts/wipe_ceph_disks.sh
 
 # Stop VMs (preserve state)
-make down
+just down
 
 # Full teardown (prompts for confirmation)
-make destroy
+just destroy
+
+# Force teardown and time the rebuild (fish alias: joof)
+just --yes destroy && time just up
 ```
 
 ---
