@@ -40,3 +40,6 @@ deploy_ceph-lab.pub
 
 # Claude Code project config (personal tool settings)
 .claude/
+
+# Antigravity CLI project links (local host paths, never commit)
+.antigravitycli/
