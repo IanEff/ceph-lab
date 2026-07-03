@@ -8,7 +8,8 @@ metadata:
 spec:
   endpointSelector: {}
   ingress:
-    # RGW S3, MGR dashboard, Prometheus metrics, Rook operator metrics
+    # RGW S3, MGR dashboard, Prometheus metrics, Rook exporter metrics
+    # (2112 removed — no rook-ceph-operator Prometheus endpoint ever existed)
     - fromEntities: [cluster]
       toPorts:
         - ports:
@@ -16,7 +17,6 @@ spec:
             - { port: "7000", protocol: TCP }
             - { port: "9283", protocol: TCP }
             - { port: "8080", protocol: TCP }
-            - { port: "2112", protocol: TCP }
             - { port: "9926", protocol: TCP }
     # Rook operator webhook (TLS, L4 only)
     - fromEntities: [kube-apiserver]

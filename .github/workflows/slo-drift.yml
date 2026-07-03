@@ -1,0 +1,37 @@
+name: SLO rule drift check
+
+# Fails if applications/infrastructure/sloth/prometheusservicelevels.yaml was
+# edited without re-running `just gen-slos` — the standalone `prometheus`
+# chart used in this lab reads no PrometheusRule CRs, so the rendered rule
+# groups embedded in applications/infrastructure/prometheus/values.yaml are
+# the only copy Prometheus ever loads. See provisioning/scripts/gen_slos.sh.
+on:
+  pull_request:
+    paths:
+      - "applications/infrastructure/sloth/prometheusservicelevels.yaml"
+      - "applications/infrastructure/prometheus/values.yaml"
+      - "provisioning/scripts/gen_slos.sh"
+
+jobs:
+  check-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install sloth CLI (pinned v0.16.0, matches the vendored chart version)
+        run: |
+          curl -sSL -o /usr/local/bin/sloth \
+            https://github.com/slok/sloth/releases/download/v0.16.0/sloth-linux-amd64
+          chmod +x /usr/local/bin/sloth
+          sloth version
+
+      - name: Install yq
+        uses: mikefarah/yq@v4.53.3
+
+      - name: Regenerate and diff
+        run: |
+          ./provisioning/scripts/gen_slos.sh
+          git diff --exit-code -- applications/infrastructure/prometheus/values.yaml || {
+            echo "::error::applications/infrastructure/prometheus/values.yaml is stale — run 'just gen-slos' and commit the result."
+            exit 1
+          }

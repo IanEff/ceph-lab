@@ -219,7 +219,7 @@
       "type": "stat",
       "id": 9,
       "title": "Error budget remaining — the clock",
-      "description": "SLO (Sloth-backed, sloth_id=ceph-osd-latency): 99% of writes < 50ms, 30-day period. Was read-latency (99.9%/100ms) before this SLO's Sloth cutover — a real semantic change, not a rename. When it hits zero, you've blown the SLO.",
+      "description": "SLO (Sloth-backed, sloth_id=ceph-osd-latency): 99% of writes < 100ms, 30-day period (corrected from a guessed <50ms bucket boundary — le=\"0.049999\" doesn't exist, verified live 2026-07-03). Was read-latency (99.9%/100ms) before this SLO's Sloth cutover — a real semantic change, not a rename. When it hits zero, you've blown the SLO.",
       "gridPos": { "x": 0, "y": 31, "w": 8, "h": 4 },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },

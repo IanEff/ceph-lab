@@ -28,3 +28,7 @@ ssh:
 # merge kubeconfig + SSH aliases after a restart
 kubeconfig:
     python3 provisioning/scripts/manage_k8s_config.py add
+
+# regenerate Prometheus rule groups from the Sloth SLO specs (requires sloth-cli, yq)
+gen-slos:
+    provisioning/scripts/gen_slos.sh
