@@ -117,9 +117,6 @@ spec:
                           time.sleep(5)
               EOF
 
-              # Strip the YAML indentation spaces
-              sed -i 's/^              //' /start-traffic.py
-
               # Create the shell helper wrapper
               cat <<'EOF' > /start-traffic.sh
               #!/bin/sh
