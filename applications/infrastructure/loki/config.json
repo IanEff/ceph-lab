@@ -1,0 +1,6 @@
+{
+  "appName": "loki",
+  "syncWave": "5",
+  "namespace": "logging",
+  "localPath": "applications/infrastructure/loki"
+}

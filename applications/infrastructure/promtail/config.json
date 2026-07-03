@@ -1,0 +1,6 @@
+{
+  "appName": "promtail",
+  "syncWave": "6",
+  "namespace": "logging",
+  "localPath": "applications/infrastructure/promtail"
+}
