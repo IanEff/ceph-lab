@@ -1,5 +1,16 @@
 # Operations Log
 
+## [2026-07-03] - PR1.6: SLO Integrity Fixes
+
+### Action
+- Cut branch `fix/slo-integrity-pr1.6`.
+- Modified `applications/infrastructure/sloth/prometheusservicelevels.yaml`:
+  - Aligned OSD write latency SLO to query `job="ceph-latency-bridge"` and use `le="102.399999"` (since the exporter divides raw nanosecond values by `1e6`, making values millisecond-based).
+  - Wrapped `ceph-health` raw SLI query in `max()` to aggregate away multiple series resulting from double-scraped MGR target.
+- Updated `applications/rook/dashboards/prototype-observability.json` to use `le="102.399999"` bucket and filter to `job="ceph-latency-bridge"` for OSD latency panels.
+- Regenerated Prometheus rules by running `just gen-slos` which rendered rule groups inside `applications/infrastructure/prometheus/values.yaml`.
+- Updated `CLAUDE.md` and `GEMINI.md` gotchas to document both the millisecond-based OSD latency bucket configuration and the requirement for Sloth SLIs to aggregate to singleton series.
+
 ## [2026-07-03] - Deploy Tempo & OTel Collector, Enable Tracing
 
 ### Action
@@ -17,3 +28,4 @@
 - Identified that `ceph-rgw-availability` SLO rules were querying `job="rook-ceph-mgr"` but the metrics are exported under `job="rook-ceph-exporter"`.
 - Removed the incorrect `{job="rook-ceph-mgr"}` filter in `applications/infrastructure/sloth/prometheusservicelevels.yaml`.
 - Regenerated Prometheus rules via `just gen-slos`.
+- Amended PR1.6 to drop explicit duplicate jobs `rook-ceph-mgr` and `rook-ceph-exporter` in Prometheus values since the `kubernetes-pods` annotation path covers them.

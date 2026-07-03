@@ -73,10 +73,10 @@ spec:
         "<50ms" to "<100ms" to match the actual bucket boundary.
       sli:
         events:
-          totalQuery: sum(rate(ceph_osd_op_w_latency_count[{{.window}}]))
+          totalQuery: sum(rate(ceph_osd_op_w_latency_count{job="ceph-latency-bridge"}[{{.window}}]))
           errorQuery: >-
-            sum(rate(ceph_osd_op_w_latency_count[{{.window}}]))
-            - sum(rate(ceph_osd_op_w_latency_bucket{le="0.099999"}[{{.window}}]))
+            sum(rate(ceph_osd_op_w_latency_count{job="ceph-latency-bridge"}[{{.window}}]))
+            - sum(rate(ceph_osd_op_w_latency_bucket{job="ceph-latency-bridge",le="102.399999"}[{{.window}}]))
       alerting:
         name: CephOSDLatencySLO
         labels:
@@ -105,7 +105,7 @@ spec:
         ERR (2) both count as a violation for this window (clamped to 1).
       sli:
         raw:
-          errorRatioQuery: avg_over_time(clamp_max(ceph_health_status, 1)[{{.window}}:1m])
+          errorRatioQuery: max(avg_over_time(clamp_max(ceph_health_status, 1)[{{.window}}:1m]))
       alerting:
         name: CephHealthSLO
         labels:

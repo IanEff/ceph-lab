@@ -81,11 +81,12 @@ This project contains custom Gemini CLI skills in `.github/skills/`. For GitOps 
 4. **`CephFilesystemSubVolumeGroup` is required** (Rook ≥ v1.17) — without it, CephFS dynamic provisioning silently fails.
 5. **ArgoCD runs insecure** — TLS terminates at the Cilium Gateway. Service URLs work at https://*.ceph.lab.
 6. **L7 Policies (CNP) are in effect** — Cilium Network Policies in `applications/infrastructure/l7-policies/` enforce strict network isolation.
-7. **OSD Performance Histograms precision** — Ceph OSD histograms (via `ceph-latency-bridge`) export bucket boundaries with high floating-point precision (e.g., `le="0.099999"`). PromQL queries MUST match these exact labels.
+7. **OSD Performance Histograms precision & units** — Ceph OSD histograms (via `ceph-latency-bridge`) export bucket boundaries with millisecond units because the exporter divides raw nanosecond values by `1e6` (e.g., `le="102.399999"` represents ~102.4ms). PromQL queries MUST match these exact labels.
 8. **`virtiofs` mounts are async** — Lima YAML provision steps poll for `/ceph-lab/provisioning/provision.env` (up to 60s) before running scripts.
 9. **`socket_vmnet` requirement** — Must be at `/opt/socket_vmnet` for the 192.168.56.0/24 host-only network. Run `make setup` once.
 10. **`lima0` default route break** — DHCP on `lima0` must have `use-routes: false` to prevent pod egress breakage (already in templates).
 11. **Definitive Observability Dashboard** — `ceph-observability-mach-2.json` is the definitive reference for Health → SLI → SLO.
+12. **Sloth SLIs must aggregate to a singleton series** — any scrape source scraped multiple times (e.g., `mgr` pod double-scraped by the annotation-based `kubernetes-pods` job and the explicit `rook-ceph-mgr` job) will duplicate metric streams. If the SLI doesn't aggregate (e.g., wrapping raw queries in `max()`), multiple series are written per `sloth_id` (like `slo:current_burn_rate:ratio`), which causes downstream systems like rattle to behave unpredictably.
 
 ---
 
