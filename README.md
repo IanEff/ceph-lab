@@ -23,7 +23,7 @@ A fully-gitopsed Rook/Ceph playground on k3s - a sandbox to play around with cep
 | Storage | Rook v1.19.1 + Ceph Squid v19.2.2 | RBD, CephFS, RGW (S3) |
 | GitOps | ArgoCD stable | Kustomize-Helm, sync waves, insecure (TLS at gateway) |
 | TLS | cert-manager v1.14.5 | Self-signed CA `ceph-lab-ca`, wildcard `*.ceph.lab` |
-| Observability | kube-prometheus-stack | Prometheus + Grafana |
+| Observability | Prometheus, Grafana, Sloth | Standalone charts (no operator), SLO burn-rates, Hubble L7 flow metrics |
 
 ---
 
@@ -122,12 +122,13 @@ Everything is deployed in dependency order — no manual sequencing needed:
 | -6 | prometheus-operator-crds | CRDs before the stack |
 | -5 | grafana, prometheus | Observability backbone |
 | 1 | l7-policies | CiliumNetworkPolicies (Cilium must exist) |
+| 5 | topology-catalog | Static `catalog-info.yaml` ConfigMap |
 | 10 | argocd-ingress | HTTPRoutes + GRPCRoute for ArgoCD UI |
 | 20 | rook operator | Helm chart, CRDs |
 | 25 | rook cluster | CephCluster CR — PostSync gate blocks until `HEALTH_OK` |
 | 30 | rook storage, ceph-latency-bridge | BlockPool, CephFS, ObjectStores, toolbox; SLO metrics exporter |
 | 31 | rook dashboards | Grafana ConfigMaps for Ceph Cluster/OSD/Pool views |
-| 32 | elk-slo-dashboard | Ceph OSD SLO alerts and burn-rate dashboard |
+| 33 | sloth | `PrometheusServiceLevel` CRs + SLO burn-rate rules |
 | 35 | rook gateway | HTTPRoutes for Ceph Dashboard, S3 endpoints |
 | 40 | s3-traffic-generator | Optional load generator for S3 |
 
@@ -229,4 +230,7 @@ See also:
 - **Gateway API CRDs must precede Cilium** — `install_cilium.sh` installs them first so Cilium discovers the CRDs on startup and auto-creates the `cilium` GatewayClass.
 - **CephFilesystemSubVolumeGroup is required** (Rook v1.17+) — included in `rook/storage/filesystem.yaml`. Without it dynamic CephFS provisioning silently fails.
 - **PostSync health gate** — `rook-cluster` has a PostSync Job that polls `CephCluster` until `state=Connected` and `health=HEALTH_OK` before ArgoCD advances to wave 30.
-- **Hubble metrics** are disabled at bootstrap (chicken-and-egg with Prometheus CRDs) and should be enabled once `kube-prometheus-stack` is synced.
+- **Hubble metrics** are disabled at bootstrap and should be enabled once Prometheus is synced. They provide L7 flow data and blast-radius metrics.
+- **Standalone Prometheus, no Operator** — We run the community `prometheus` and `grafana` charts, not `kube-prometheus-stack`. Since there is no operator, `PrometheusRule` and `ServiceMonitor` CRs are not consumed by the cluster.
+- **Sloth SLOs at build time** — Because there's no operator, Sloth is run as a build-time step (`just gen-slos`) to render rules directly into Prometheus `serverFiles`, rather than running as a live controller.
+- **Topology Catalog** — A static `catalog-info.yaml` is deployed as a ConfigMap to map out Ceph and infrastructure dependencies.

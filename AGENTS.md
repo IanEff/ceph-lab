@@ -122,10 +122,12 @@ DNS: `*.ceph.lab → 192.168.56.200` via macOS dnsmasq.
 | -5 | cert-manager, kube-prometheus-stack | true | true |
 | 0 | metrics-server | true | true |
 | 1 | l7-policies (CiliumNetworkPolicies) | true | true |
+| 5 | topology-catalog (static `catalog-info.yaml` ConfigMap) | true | true |
 | 10 | argocd-ingress | true | true |
 | 20 | rook-operator | **false** | true |
 | 25 | rook-cluster | **false** | **false** |
 | 30 | rook-storage | true | true |
+| 33 | sloth (`PrometheusServiceLevel` CRs + SLO burn-rate rules) | true | true |
 | 35 | rook-gateway | true | true |
 
 ---

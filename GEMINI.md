@@ -55,13 +55,14 @@ The `infrastructure-set` ApplicationSet auto-discovers it. No other file needs e
 | -6 | prometheus-operator-crds | true | true |
 | -5 | grafana, prometheus | true | true |
 | 1 | l7-policies (CiliumNetworkPolicies) | true | true |
+| 5 | topology-catalog (static `catalog-info.yaml` ConfigMap) | true | true |
 | 10 | argocd-ingress | true | true |
 | 20 | rook-operator | **false** | true |
 | 25 | rook-cluster | **false** | **false** |
 | 30 | rook-storage | true | true |
 | 30 | ceph-latency-bridge (SLO metrics) | true | true |
 | 31 | rook-dashboards (Grafana CMs) | true | true |
-| 32 | elk-slo-dashboard (Ceph OSD SLO) | true | true |
+| 33 | sloth (`PrometheusServiceLevel` CRs + SLO burn-rate rules) | true | true |
 | 35 | rook-gateway | true | true |
 
 ### 5. Helm is always via Kustomize
