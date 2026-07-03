@@ -1,0 +1,47 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: tracing
+resources:
+  - namespace.yaml
+helmCharts:
+  - name: tempo
+    repo: https://grafana.github.io/helm-charts
+    version: 1.10.1
+    releaseName: tempo
+    namespace: tracing
+    valuesInline:
+      tempo:
+        repository: grafana/tempo
+        tag: 2.6.1
+        persistence:
+          enabled: true
+          storageClass: rook-ceph-block
+          size: 10Gi
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        structuredConfig:
+          multitenancy_enabled: false
+          compactor:
+            compaction:
+              block_retention: 4h
+          ingester:
+            lifecycler:
+              ring:
+                kvstore:
+                  store: inmemory
+                replication_factor: 1
+      server:
+        http_listen_port: 3100
+      distributor:
+        receivers:
+          otlp:
+            protocols:
+              grpc:
+                endpoint: 0.0.0.0:4317
+              http:
+                endpoint: 0.0.0.0:4318

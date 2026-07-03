@@ -5,3 +5,4 @@ resources:
   - monitoring/cnp-monitoring.yaml
   - rook-ceph/cnp-rook-ceph.yaml
   - ceph-clients/cnp-ceph-clients.yaml
+  - tracing/cnp-tracing.yaml

@@ -28,35 +28,104 @@ spec:
     spec:
       containers:
         - name: traffic-gen
-          image: peakcom/s5cmd:v2.2.2
+          image: python:3.11-slim
           command: ["/bin/sh", "-c"]
           args:
             - |
               echo "Waiting for bucket credentials..."
               until [ -f /s3/AWS_ACCESS_KEY_ID ]; do sleep 2; done
-              
-              # Create a helper script for the user
+
+              echo "Installing Python OpenTelemetry dependencies..."
+              pip install --no-cache-dir boto3 opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp opentelemetry-instrumentation-botocore
+
+              # Write the Python script with indentation
+              cat <<'EOF' > /start-traffic.py
+              import os
+              import time
+              import uuid
+              import boto3
+              from opentelemetry import trace
+              from opentelemetry.sdk.trace import TracerProvider
+              from opentelemetry.sdk.trace.export import BatchSpanProcessor
+              from opentelemetry.sdk.resources import Resource
+              from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+              from opentelemetry.instrumentation.botocore import BotocoreInstrumentor
+
+              # Initialize OpenTelemetry
+              resource = Resource(attributes={"service.name": "s3-traffic-generator"})
+              provider = TracerProvider(resource=resource)
+              processor = BatchSpanProcessor(OTLPSpanExporter(endpoint="otel-collector.tracing.svc.cluster.local:4317", insecure=True))
+              provider.add_span_processor(processor)
+              trace.set_tracer_provider(provider)
+
+              # Auto-instrument botocore (S3 client calls)
+              BotocoreInstrumentor().instrument()
+
+              tracer = trace.get_tracer(__name__)
+
+              # Read S3 credentials
+              with open('/s3/AWS_ACCESS_KEY_ID', 'r') as f:
+                  aws_access_key = f.read().strip()
+              with open('/s3/AWS_SECRET_ACCESS_KEY', 'r') as f:
+                  aws_secret_key = f.read().strip()
+              with open('/s3/BUCKET_HOST', 'r') as f:
+                  bucket_host = f.read().strip()
+              with open('/s3/BUCKET_PORT', 'r') as f:
+                  bucket_port = f.read().strip()
+              with open('/s3/BUCKET_NAME', 'r') as f:
+                  bucket_name = f.read().strip()
+
+              s3_endpoint = f"http://{bucket_host}:{bucket_port}"
+
+              print(f"Connecting to S3 at {s3_endpoint} on bucket {bucket_name}...")
+              s3 = boto3.client(
+                  's3',
+                  endpoint_url=s3_endpoint,
+                  aws_access_key_id=aws_access_key,
+                  aws_secret_access_key=aws_secret_key
+              )
+
+              print("Starting S3 traffic generation loop...")
+              while True:
+                  with tracer.start_as_current_span("traffic-iteration") as parent_span:
+                      try:
+                          # 1. Write objects
+                          uploaded_keys = []
+                          for i in range(10):
+                              key = f"load-test-{int(time.time())}-{uuid.uuid4().hex[:6]}.txt"
+                              with tracer.start_as_current_span("s3-upload-file") as upload_span:
+                                  s3.put_object(Bucket=bucket_name, Key=key, Body=b"A"*1024)
+                                  uploaded_keys.append(key)
+                              
+                          # 2. List objects
+                          with tracer.start_as_current_span("s3-list-objects") as list_span:
+                              response = s3.list_objects_v2(Bucket=bucket_name)
+                              contents = response.get('Contents', [])
+                              print(f"Listed {len(contents)} objects in bucket.")
+                              
+                          time.sleep(5)
+                          
+                          # 3. Clean up uploaded files
+                          for key in uploaded_keys:
+                              with tracer.start_as_current_span("s3-delete-object") as delete_span:
+                                  s3.delete_object(Bucket=bucket_name, Key=key)
+                          print(f"Cleaned up {len(uploaded_keys)} objects.")
+                          
+                          time.sleep(2)
+                      except Exception as e:
+                          print(f"Error during iteration: {e}")
+                          time.sleep(5)
+              EOF
+
+              # Strip the YAML indentation spaces
+              sed -i 's/^              //' /start-traffic.py
+
+              # Create the shell helper wrapper
               cat <<'EOF' > /start-traffic.sh
               #!/bin/sh
-              export AWS_ACCESS_KEY_ID=$(cat /s3/AWS_ACCESS_KEY_ID)
-              export AWS_SECRET_ACCESS_KEY=$(cat /s3/AWS_SECRET_ACCESS_KEY)
-              export S3_ENDPOINT="http://$(cat /s3/BUCKET_HOST):$(cat /s3/BUCKET_PORT)"
-              export BUCKET_NAME=$(cat /s3/BUCKET_NAME)
-              
-              echo "Starting traffic generation on bucket: ${BUCKET_NAME} at ${S3_ENDPOINT}"
-              head -c 1024 /dev/urandom > /tmp/dummy.txt
-              
-              while true; do
-                for i in $(seq 1 10); do
-                  /s5cmd --endpoint-url ${S3_ENDPOINT} cp /tmp/dummy.txt s3://${BUCKET_NAME}/load-test-$(date +%s)-${i}.txt
-                done
-                /s5cmd --endpoint-url ${S3_ENDPOINT} ls s3://${BUCKET_NAME}/
-                sleep 5
-                /s5cmd --endpoint-url ${S3_ENDPOINT} rm "s3://${BUCKET_NAME}/load-test-*"
-                sleep 2
-              done
+              python3 /start-traffic.py
               EOF
-              
+
               chmod +x /start-traffic.sh
               echo "✅ Environment ready. To start traffic, run:"
               echo "   kubectl exec -it $(hostname) -- /start-traffic.sh"
