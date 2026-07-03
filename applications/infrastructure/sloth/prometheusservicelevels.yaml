@@ -1,3 +1,12 @@
+# BUILD-TIME SPEC, NOT A LIVE K8S OBJECT — the Sloth runtime chart (and its
+# CRDs) were retired from this cluster: the standalone `prometheus` chart
+# reads no monitoring.coreos.com CRs, so a live Sloth controller generating
+# PrometheusRule CRs nobody consumes was pure overhead. This CRD-shaped YAML
+# is now only an input to `sloth generate` (provisioning/scripts/gen_slos.sh
+# / `just gen-slos`), which renders it to plain rule groups embedded in
+# applications/infrastructure/prometheus/values.yaml. Edit this file, run
+# `just gen-slos`, commit both.
+#
 # sloth_id is NOT metadata.name — Sloth computes it as "{spec.service}-{slo.name}"
 # (confirmed against sloth/internal/storage/io/k8s_sloth.go). service/name below
 # are chosen so the concatenation matches rattle's SLO.ID exactly, per the
@@ -52,26 +61,22 @@ spec:
     - name: latency
       objective: 99
       description: >-
-        99% of OSD writes complete under 50ms. Supersedes the hand-rolled
-        elk-slo-dashboard burn-rate rule (same underlying metrics, same
-        threshold) — see applications/infrastructure/elk-slo-dashboard's
-        removal in this same change.
-        EXECUTION-TIME CHECKPOINT (gotcha #11/#12): le="0.049999" below is a
-        reasoned guess, not a confirmed value — provisioning/scripts/ceph_latency_exporter.py
-        computes le = range_info["max"]/1e6 from Ceph's own irregular histogram
-        boundaries, and mach-2's read-latency SLO shows the 100ms bucket is
-        actually "0.099999" (99999 microseconds, not 100000) — by the same
-        pattern the 50ms bucket is expected at 49999us = "0.049999", but this
-        MUST be confirmed against a live cluster
-        (curl '.../api/v1/query?query=ceph_osd_op_w_latency_bucket' | jq
-        '.data.result[].metric.le') before trusting this SLO's numbers, and
-        corrected here if wrong.
+        99% of OSD writes complete under 100ms. Supersedes the hand-rolled
+        elk-slo-dashboard burn-rate rule (same underlying metrics) — see
+        applications/infrastructure/elk-slo-dashboard's removal in this same
+        change.
+        VERIFIED LIVE 2026-07-03 (see docs/ceph-lab-running-notes F4): the
+        le="0.049999" guess was wrong — ceph_osd_op_w_latency_bucket has no
+        50ms bucket. provisioning/scripts/ceph_latency_exporter.py's 2x
+        ladder starts at le="0.099999" (99999us, not 100000us), same as
+        mach-2's existing read-latency SLO. Objective corrected from
+        "<50ms" to "<100ms" to match the actual bucket boundary.
       sli:
         events:
           totalQuery: sum(rate(ceph_osd_op_w_latency_count[{{.window}}]))
           errorQuery: >-
             sum(rate(ceph_osd_op_w_latency_count[{{.window}}]))
-            - sum(rate(ceph_osd_op_w_latency_bucket{le="0.049999"}[{{.window}}]))
+            - sum(rate(ceph_osd_op_w_latency_bucket{le="0.099999"}[{{.window}}]))
       alerting:
         name: CephOSDLatencySLO
         labels:
