@@ -9,10 +9,12 @@
 | -5 | `cert-manager`, `kube-prometheus-stack`, `loki`, `tempo` | true | true | Observability backbone; cert-manager issues certs for everything |
 | 0 | `alloy`, `sealed-secrets`, `metrics-server` | true | true | Depend on CRDs from wave -5 |
 | 1 | `l7-policies` | true | true | CiliumNetworkPolicies — Cilium must already be running |
+| 5 | `topology-catalog` | true | true | Static `catalog-info.yaml` ConfigMap — no runtime deps, don't couple to Sloth's wave |
 | 10 | `argocd-ingress` | true | true | HTTPRoutes for ArgoCD UI — needs gateway + cert-manager |
 | 20 | `rook-operator` | **false** | true | Never auto-delete operator; CRDs must precede cluster CR |
 | 25 | `rook-cluster` | **false** | **false** | Operator mutates CephCluster; `ignoreDifferences` on `/status` and `/spec/mon/count` |
 | 30 | `rook-storage` | true | true | Block/CephFS/RGW pools — safe to recreate |
+| 33 | `sloth` | true | true | `PrometheusServiceLevel` CRs — needs `ceph-latency-bridge` (30) metrics and coordinates with `elk-slo-dashboard`'s (32) retirement |
 | 35 | `rook-gateway` | true | true | HTTPRoutes for Ceph Dashboard — needs rook-cluster + gateway |
 
 ## Choosing a Wave for a New Component

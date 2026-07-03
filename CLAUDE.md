@@ -54,7 +54,8 @@ applications/
   config/             # gitops.env — single source of truth for all IPs, versions, hostnames
   infrastructure/     # one dir per infra component; each has config.json + kustomization.yaml
     ceph-latency-bridge/  # native OSD histogram reconstruction (wave 30)
-    elk-slo-dashboard/    # Ceph OSD SLO alerts and dashboard (wave 32)
+    sloth/            # PrometheusServiceLevel CRs + SLO burn-rate rules (wave 33)
+    topology-catalog/ # static catalog-info.yaml topology map, ConfigMap (wave 5)
     l7-policies/      # CiliumNetworkPolicies, organized by namespace subdirectory
       argocd/         # cnp-argocd.yaml
       ceph-clients/   # cnp-ceph-clients.yaml
@@ -136,13 +137,14 @@ All policies live in `applications/infrastructure/l7-policies/`, organized into 
 | -6 | prometheus-operator-crds | true | true |
 | -5 | grafana, prometheus | true | true |
 | 1 | l7-policies (CiliumNetworkPolicies) | true | true |
+| 5 | topology-catalog (static `catalog-info.yaml` ConfigMap) | true | true |
 | 10 | argocd-ingress | true | true |
 | 20 | rook-operator | **false** | true |
 | 25 | rook-cluster | **false** | **false** |
 | 30 | rook-storage | true | true |
 | 30 | ceph-latency-bridge (SLO metrics) | true | true |
 | 31 | rook-dashboards (Grafana ConfigMaps) | true | true |
-| 32 | elk-slo-dashboard (Ceph OSD SLO) | true | true |
+| 33 | sloth (`PrometheusServiceLevel` CRs + SLO burn-rate rules) | true | true |
 | 35 | rook-gateway | true | true |
 
 Rook operator and rook-cluster prune/selfHeal settings are intentional — they protect Ceph data from accidental ArgoCD deletes.
