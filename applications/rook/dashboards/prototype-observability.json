@@ -254,7 +254,7 @@
           }
         }
       },
-      "targets": [{ "expr": "sum(rate(ceph_osd_op_w_latency_count[1m])) - sum(rate(ceph_osd_op_w_latency_bucket{le=\"0.099999\"}[1m]))", "legendFormat": "Slow Writes/s", "refId": "A" }]
+      "targets": [{ "expr": "sum(rate(ceph_osd_op_w_latency_count{job=\"ceph-latency-bridge\"}[1m])) - sum(rate(ceph_osd_op_w_latency_bucket{job=\"ceph-latency-bridge\",le=\"102.399999\"}[1m]))", "legendFormat": "Slow Writes/s", "refId": "A" }]
     },
     {
       "type": "stat",
@@ -280,7 +280,7 @@
           }
         }
       },
-      "targets": [{ "expr": "sum(rate(ceph_native_osd_op_r_latency_seconds_bucket{le=\"0.099999\"}[5m])) / sum(rate(ceph_native_osd_op_r_latency_seconds_count[5m]))", "legendFormat": "Success Rate", "refId": "A" }]
+      "targets": [{ "expr": "sum(rate(ceph_native_osd_op_r_latency_seconds_bucket{job=\"ceph-latency-bridge\",le=\"102.399999\"}[5m])) / sum(rate(ceph_native_osd_op_r_latency_seconds_count{job=\"ceph-latency-bridge\"}[5m]))", "legendFormat": "Success Rate", "refId": "A" }]
     },
     {
       "type": "stat",
@@ -306,7 +306,7 @@
           }
         }
       },
-      "targets": [{ "expr": "sum(rate(ceph_native_osd_op_w_latency_seconds_bucket{le=\"0.099999\"}[5m])) / sum(rate(ceph_native_osd_op_w_latency_seconds_count[5m]))", "legendFormat": "Success Rate", "refId": "A" }]
+      "targets": [{ "expr": "sum(rate(ceph_native_osd_op_w_latency_seconds_bucket{job=\"ceph-latency-bridge\",le=\"102.399999\"}[5m])) / sum(rate(ceph_native_osd_op_w_latency_seconds_count{job=\"ceph-latency-bridge\"}[5m]))", "legendFormat": "Success Rate", "refId": "A" }]
     },
     {
       "type": "stat",

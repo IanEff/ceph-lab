@@ -86,26 +86,7 @@ serverFiles:
       # The chart's default scrape_configs already cover kubernetes-service-endpoints,
       # kubernetes-nodes, kubernetes-pods, etc. Only add custom targets below.
 
-      # Rook-ceph MGR metrics (port 9283) — scraped directly regardless of annotation.
-      - job_name: "rook-ceph-mgr"
-        static_configs:
-          - targets:
-              - "rook-ceph-mgr.rook-ceph.svc.cluster.local:9283"
-        relabel_configs:
-          - target_label: job
-            replacement: rook-ceph-mgr
 
-      # Rook exporter metrics (port 9926) — the real Ceph-cluster-wide
-      # exporter Rook ships. (There is no "rook-ceph-operator:2112" endpoint;
-      # the operator itself exposes no Prometheus metrics — a prior version
-      # of this job scraped a Service that never existed.)
-      - job_name: "rook-ceph-exporter"
-        static_configs:
-          - targets:
-              - "rook-ceph-exporter.rook-ceph.svc.cluster.local:9926"
-        relabel_configs:
-          - target_label: job
-            replacement: rook-ceph-exporter
 
       # Hubble metrics (Cilium flow observability).
       - job_name: "hubble-metrics"
@@ -294,9 +275,9 @@ serverFiles:
       - name: sloth-slo-sli-recordings-ceph-osd-latency
         rules:
           - expr: |
-              (sum(rate(ceph_osd_op_w_latency_count[5m])) - sum(rate(ceph_osd_op_w_latency_bucket{le="0.099999"}[5m])))
+              (sum(rate(ceph_osd_op_w_latency_count{job="ceph-latency-bridge"}[5m])) - sum(rate(ceph_osd_op_w_latency_bucket{job="ceph-latency-bridge",le="102.399999"}[5m])))
               /
-              (sum(rate(ceph_osd_op_w_latency_count[5m])))
+              (sum(rate(ceph_osd_op_w_latency_count{job="ceph-latency-bridge"}[5m])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-osd-latency
@@ -305,9 +286,9 @@ serverFiles:
               sloth_window: 5m
             record: slo:sli_error:ratio_rate5m
           - expr: |
-              (sum(rate(ceph_osd_op_w_latency_count[30m])) - sum(rate(ceph_osd_op_w_latency_bucket{le="0.099999"}[30m])))
+              (sum(rate(ceph_osd_op_w_latency_count{job="ceph-latency-bridge"}[30m])) - sum(rate(ceph_osd_op_w_latency_bucket{job="ceph-latency-bridge",le="102.399999"}[30m])))
               /
-              (sum(rate(ceph_osd_op_w_latency_count[30m])))
+              (sum(rate(ceph_osd_op_w_latency_count{job="ceph-latency-bridge"}[30m])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-osd-latency
@@ -316,9 +297,9 @@ serverFiles:
               sloth_window: 30m
             record: slo:sli_error:ratio_rate30m
           - expr: |
-              (sum(rate(ceph_osd_op_w_latency_count[1h])) - sum(rate(ceph_osd_op_w_latency_bucket{le="0.099999"}[1h])))
+              (sum(rate(ceph_osd_op_w_latency_count{job="ceph-latency-bridge"}[1h])) - sum(rate(ceph_osd_op_w_latency_bucket{job="ceph-latency-bridge",le="102.399999"}[1h])))
               /
-              (sum(rate(ceph_osd_op_w_latency_count[1h])))
+              (sum(rate(ceph_osd_op_w_latency_count{job="ceph-latency-bridge"}[1h])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-osd-latency
@@ -327,9 +308,9 @@ serverFiles:
               sloth_window: 1h
             record: slo:sli_error:ratio_rate1h
           - expr: |
-              (sum(rate(ceph_osd_op_w_latency_count[2h])) - sum(rate(ceph_osd_op_w_latency_bucket{le="0.099999"}[2h])))
+              (sum(rate(ceph_osd_op_w_latency_count{job="ceph-latency-bridge"}[2h])) - sum(rate(ceph_osd_op_w_latency_bucket{job="ceph-latency-bridge",le="102.399999"}[2h])))
               /
-              (sum(rate(ceph_osd_op_w_latency_count[2h])))
+              (sum(rate(ceph_osd_op_w_latency_count{job="ceph-latency-bridge"}[2h])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-osd-latency
@@ -338,9 +319,9 @@ serverFiles:
               sloth_window: 2h
             record: slo:sli_error:ratio_rate2h
           - expr: |
-              (sum(rate(ceph_osd_op_w_latency_count[6h])) - sum(rate(ceph_osd_op_w_latency_bucket{le="0.099999"}[6h])))
+              (sum(rate(ceph_osd_op_w_latency_count{job="ceph-latency-bridge"}[6h])) - sum(rate(ceph_osd_op_w_latency_bucket{job="ceph-latency-bridge",le="102.399999"}[6h])))
               /
-              (sum(rate(ceph_osd_op_w_latency_count[6h])))
+              (sum(rate(ceph_osd_op_w_latency_count{job="ceph-latency-bridge"}[6h])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-osd-latency
@@ -349,9 +330,9 @@ serverFiles:
               sloth_window: 6h
             record: slo:sli_error:ratio_rate6h
           - expr: |
-              (sum(rate(ceph_osd_op_w_latency_count[1d])) - sum(rate(ceph_osd_op_w_latency_bucket{le="0.099999"}[1d])))
+              (sum(rate(ceph_osd_op_w_latency_count{job="ceph-latency-bridge"}[1d])) - sum(rate(ceph_osd_op_w_latency_bucket{job="ceph-latency-bridge",le="102.399999"}[1d])))
               /
-              (sum(rate(ceph_osd_op_w_latency_count[1d])))
+              (sum(rate(ceph_osd_op_w_latency_count{job="ceph-latency-bridge"}[1d])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-osd-latency
@@ -360,9 +341,9 @@ serverFiles:
               sloth_window: 1d
             record: slo:sli_error:ratio_rate1d
           - expr: |
-              (sum(rate(ceph_osd_op_w_latency_count[3d])) - sum(rate(ceph_osd_op_w_latency_bucket{le="0.099999"}[3d])))
+              (sum(rate(ceph_osd_op_w_latency_count{job="ceph-latency-bridge"}[3d])) - sum(rate(ceph_osd_op_w_latency_bucket{job="ceph-latency-bridge",le="102.399999"}[3d])))
               /
-              (sum(rate(ceph_osd_op_w_latency_count[3d])))
+              (sum(rate(ceph_osd_op_w_latency_count{job="ceph-latency-bridge"}[3d])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-osd-latency
@@ -444,7 +425,7 @@ serverFiles:
             record: sloth_slo_info
       - name: sloth-slo-sli-recordings-ceph-health
         rules:
-          - expr: (avg_over_time(clamp_max(ceph_health_status, 1)[5m:1m]))
+          - expr: (max(avg_over_time(clamp_max(ceph_health_status, 1)[5m:1m])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-health
@@ -452,7 +433,7 @@ serverFiles:
               sloth_slo: health
               sloth_window: 5m
             record: slo:sli_error:ratio_rate5m
-          - expr: (avg_over_time(clamp_max(ceph_health_status, 1)[30m:1m]))
+          - expr: (max(avg_over_time(clamp_max(ceph_health_status, 1)[30m:1m])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-health
@@ -460,7 +441,7 @@ serverFiles:
               sloth_slo: health
               sloth_window: 30m
             record: slo:sli_error:ratio_rate30m
-          - expr: (avg_over_time(clamp_max(ceph_health_status, 1)[1h:1m]))
+          - expr: (max(avg_over_time(clamp_max(ceph_health_status, 1)[1h:1m])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-health
@@ -468,7 +449,7 @@ serverFiles:
               sloth_slo: health
               sloth_window: 1h
             record: slo:sli_error:ratio_rate1h
-          - expr: (avg_over_time(clamp_max(ceph_health_status, 1)[2h:1m]))
+          - expr: (max(avg_over_time(clamp_max(ceph_health_status, 1)[2h:1m])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-health
@@ -476,7 +457,7 @@ serverFiles:
               sloth_slo: health
               sloth_window: 2h
             record: slo:sli_error:ratio_rate2h
-          - expr: (avg_over_time(clamp_max(ceph_health_status, 1)[6h:1m]))
+          - expr: (max(avg_over_time(clamp_max(ceph_health_status, 1)[6h:1m])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-health
@@ -484,7 +465,7 @@ serverFiles:
               sloth_slo: health
               sloth_window: 6h
             record: slo:sli_error:ratio_rate6h
-          - expr: (avg_over_time(clamp_max(ceph_health_status, 1)[1d:1m]))
+          - expr: (max(avg_over_time(clamp_max(ceph_health_status, 1)[1d:1m])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-health
@@ -492,7 +473,7 @@ serverFiles:
               sloth_slo: health
               sloth_window: 1d
             record: slo:sli_error:ratio_rate1d
-          - expr: (avg_over_time(clamp_max(ceph_health_status, 1)[3d:1m]))
+          - expr: (max(avg_over_time(clamp_max(ceph_health_status, 1)[3d:1m])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-health
