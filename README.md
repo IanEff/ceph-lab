@@ -23,7 +23,7 @@ A fully-gitopsed Rook/Ceph playground on k3s - a sandbox to play around with cep
 | Storage | Rook v1.19.1 + Ceph Squid v19.2.2 | RBD, CephFS, RGW (S3) |
 | GitOps | ArgoCD stable | Kustomize-Helm, sync waves, insecure (TLS at gateway) |
 | TLS | cert-manager v1.14.5 | Self-signed CA `ceph-lab-ca`, wildcard `*.ceph.lab` |
-| Observability | Prometheus, Grafana, Sloth | Standalone charts (no operator), SLO burn-rates, Hubble L7 flow metrics |
+| Observability | Prometheus, Grafana, Sloth, Loki, Tempo, OTel | Standalone charts, SLO burn-rates, Logs, S3 traces, Hubble L7 flows |
 
 ---
 
@@ -120,9 +120,11 @@ Everything is deployed in dependency order — no manual sequencing needed:
 | -15 | gateway-api CRDs | Must exist before Cilium starts |
 | -10 | cilium | Gateway CRDs must precede; creates GatewayClass |
 | -6 | prometheus-operator-crds | CRDs before the stack |
-| -5 | grafana, prometheus | Observability backbone |
+| -5 | grafana, prometheus, tempo | Observability backbone (metrics, tracing) |
+| 0 | otel-collector | OpenTelemetry pipeline for traces |
 | 1 | l7-policies | CiliumNetworkPolicies (Cilium must exist) |
-| 5 | topology-catalog | Static `catalog-info.yaml` ConfigMap |
+| 5 | topology-catalog, loki | Static `catalog-info.yaml` ConfigMap, Log aggregation |
+| 6 | promtail | Log shipping (depends on Loki) |
 | 10 | argocd-ingress | HTTPRoutes + GRPCRoute for ArgoCD UI |
 | 20 | rook operator | Helm chart, CRDs |
 | 25 | rook cluster | CephCluster CR — PostSync gate blocks until `HEALTH_OK` |
