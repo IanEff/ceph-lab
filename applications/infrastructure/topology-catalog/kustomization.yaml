@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+
+# No consumer in this repo yet — the TopologySource resolver that reads this
+# lives in the separate `clank` repo. This ConfigMap is a known-unconsumed-
+# for-now artifact, not a bug.
+configMapGenerator:
+  - name: ceph-topology-catalog
+    files:
+      - catalog-info.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
