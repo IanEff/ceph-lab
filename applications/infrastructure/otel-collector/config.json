@@ -1,0 +1,6 @@
+{
+  "appName": "otel-collector",
+  "syncWave": "0",
+  "namespace": "tracing",
+  "localPath": "applications/infrastructure/otel-collector"
+}

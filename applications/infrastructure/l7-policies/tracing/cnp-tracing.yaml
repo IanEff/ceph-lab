@@ -1,0 +1,37 @@
+# L4 policy for the tracing namespace (Tempo, OTel Collector).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: l7-visibility
+  namespace: tracing
+spec:
+  endpointSelector: {}
+  ingress:
+    # 1. Ingress to Tempo HTTP interface (3100) from Grafana (monitoring namespace)
+    # 2. Ingress to OTel Collector OTLP (4317/4318) and Jaeger UDP (6831)
+    - fromEntities: [ cluster ]
+      toPorts:
+        - ports:
+            - { port: "3100", protocol: TCP } # Tempo HTTP query port
+            - { port: "4317", protocol: TCP } # OTLP gRPC port
+            - { port: "4318", protocol: TCP } # OTLP HTTP port
+            - { port: "6831", protocol: UDP } # Jaeger UDP compact thrift
+    - fromEntities: [ host, remote-node ]
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - { port: "53", protocol: UDP }
+            - { port: "53", protocol: TCP }
+          rules:
+            dns:
+              - matchPattern: "*"
+    - toEntities: [ cluster, kube-apiserver ]
+    - toEntities: [ world ]
+      toPorts:
+        - ports:
+            - { port: "80", protocol: TCP }
+            - { port: "443", protocol: TCP }

@@ -77,3 +77,12 @@ spec:
       toPorts:
         - ports:
             - { port: "443", protocol: TCP }
+    # Egress to tracing namespace (OTel Collector)
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: tracing
+      toPorts:
+        - ports:
+            - { port: "6831", protocol: UDP }
+            - { port: "4317", protocol: TCP }
+            - { port: "4318", protocol: TCP }

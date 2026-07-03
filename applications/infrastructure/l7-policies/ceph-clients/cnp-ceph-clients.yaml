@@ -29,10 +29,18 @@ spec:
             - { port: "8080", protocol: TCP }
           rules:
             http: [{}]
-    # HTTPS + k8s API
-    - toEntities: [cluster]
+    # HTTPS + k8s API + World (for pip install)
+    - toEntities: [cluster, world]
       toPorts:
         - ports:
             - { port: "443",  protocol: TCP }
             - { port: "6443", protocol: TCP }
     - toEntities: [kube-apiserver]
+    # Egress to tracing namespace (OTel Collector)
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: tracing
+      toPorts:
+        - ports:
+            - { port: "4317", protocol: TCP }
+            - { port: "4318", protocol: TCP }

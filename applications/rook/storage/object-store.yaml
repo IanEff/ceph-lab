@@ -22,6 +22,9 @@ spec:
     port: 80
     instances: 1
     priorityClassName: system-cluster-critical
+    rgwConfig:
+      jaeger_tracing_enable: "true"
+      jaeger_agent_port: "6831"
     resources:
       requests:
         cpu: "100m"

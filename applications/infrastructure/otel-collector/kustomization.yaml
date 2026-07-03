@@ -1,0 +1,45 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: tracing
+helmCharts:
+  - name: opentelemetry-collector
+    repo: https://open-telemetry.github.io/opentelemetry-helm-charts
+    version: 0.100.0
+    releaseName: otel-collector
+    namespace: tracing
+    valuesInline:
+      mode: deployment
+      image:
+        repository: "otel/opentelemetry-collector-contrib"
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 200m
+          memory: 512Mi
+      config:
+        receivers:
+          otlp:
+            protocols:
+              grpc:
+                endpoint: 0.0.0.0:4317
+              http:
+                endpoint: 0.0.0.0:4318
+          jaeger:
+            protocols:
+              thrift_compact:
+                endpoint: 0.0.0.0:6831
+        processors:
+          batch: {}
+        exporters:
+          otlp:
+            endpoint: "tempo.tracing.svc.cluster.local:4317"
+            tls:
+              insecure: true
+        service:
+          pipelines:
+            traces:
+              receivers: [otlp, jaeger]
+              processors: [batch]
+              exporters: [otlp]
