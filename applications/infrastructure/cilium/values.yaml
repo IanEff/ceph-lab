@@ -38,8 +38,13 @@ hubble:
     enabled:
       - dns
       - drop
-      - tcp
-      - flow
+      # tcp/flow carry destination_workload so non-HTTP traffic (Ceph's binary
+      # msgr2 protocol between OSDs) is attributable per-destination — needed
+      # for a future HubbleTrafficSource blast-radius query. Previously only
+      # httpV2 had labelsContext, so OSD-pool traffic had zero destination
+      # attribution.
+      - "tcp:labelsContext=source_namespace,source_workload,destination_namespace,destination_workload"
+      - "flow:labelsContext=source_namespace,source_workload,destination_namespace,destination_workload"
       - icmp
       - "httpV2:exemplars=true;labelsContext=source_ip,source_namespace,source_workload,destination_ip,destination_namespace,destination_workload,traffic_direction"
     # Dashboard ConfigMaps exceed the 262 KB annotation limit; disabled to

@@ -117,3 +117,13 @@ serverFiles:
         relabel_configs:
           - target_label: job
             replacement: ceph-latency-bridge
+
+      # ArgoCD application-controller metrics (argocd_app_info etc.) — needed
+      # by the argocd-sync Sloth SLO.
+      - job_name: "argocd-metrics"
+        static_configs:
+          - targets:
+              - "argocd-metrics.argocd.svc.cluster.local:8082"
+        relabel_configs:
+          - target_label: job
+            replacement: argocd-metrics

@@ -1,0 +1,17 @@
+# Sloth's own SLI/SLO plugins cover everything the four PrometheusServiceLevel
+# CRs below use (events + raw). The chart's default git-sync sidecar pulls
+# community plugins from github.com/slok/sloth-common-sli-plugins on a poll
+# loop — an extra container and an unnecessary external dependency for plugins
+# this lab doesn't use. Disabled.
+commonPlugins:
+  enabled: false
+
+# Pinned explicitly (matches the chart's own default) so a future chart bump
+# can't silently change this — Sloth's footprint should stay near-zero.
+resources:
+  requests:
+    cpu: 5m
+    memory: 75Mi
+  limits:
+    cpu: 50m
+    memory: 150Mi
