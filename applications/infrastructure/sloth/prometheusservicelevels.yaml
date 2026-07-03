@@ -35,8 +35,8 @@ spec:
         (kubectl exec ... -- /start-traffic.sh) to seed data.
       sli:
         events:
-          errorQuery: sum(rate(ceph_rgw_failed_req{job="rook-ceph-mgr"}[{{.window}}]))
-          totalQuery: sum(rate(ceph_rgw_req{job="rook-ceph-mgr"}[{{.window}}]))
+          errorQuery: sum(rate(ceph_rgw_failed_req[{{.window}}]))
+          totalQuery: sum(rate(ceph_rgw_req[{{.window}}]))
       alerting:
         name: CephRGWAvailabilitySLO
         labels:

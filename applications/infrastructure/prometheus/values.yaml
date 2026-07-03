@@ -143,9 +143,9 @@ serverFiles:
       - name: sloth-slo-sli-recordings-ceph-rgw-availability
         rules:
           - expr: |
-              (sum(rate(ceph_rgw_failed_req{job="rook-ceph-mgr"}[5m])))
+              (sum(rate(ceph_rgw_failed_req[5m])))
               /
-              (sum(rate(ceph_rgw_req{job="rook-ceph-mgr"}[5m])))
+              (sum(rate(ceph_rgw_req[5m])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-rgw-availability
@@ -154,9 +154,9 @@ serverFiles:
               sloth_window: 5m
             record: slo:sli_error:ratio_rate5m
           - expr: |
-              (sum(rate(ceph_rgw_failed_req{job="rook-ceph-mgr"}[30m])))
+              (sum(rate(ceph_rgw_failed_req[30m])))
               /
-              (sum(rate(ceph_rgw_req{job="rook-ceph-mgr"}[30m])))
+              (sum(rate(ceph_rgw_req[30m])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-rgw-availability
@@ -165,9 +165,9 @@ serverFiles:
               sloth_window: 30m
             record: slo:sli_error:ratio_rate30m
           - expr: |
-              (sum(rate(ceph_rgw_failed_req{job="rook-ceph-mgr"}[1h])))
+              (sum(rate(ceph_rgw_failed_req[1h])))
               /
-              (sum(rate(ceph_rgw_req{job="rook-ceph-mgr"}[1h])))
+              (sum(rate(ceph_rgw_req[1h])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-rgw-availability
@@ -176,9 +176,9 @@ serverFiles:
               sloth_window: 1h
             record: slo:sli_error:ratio_rate1h
           - expr: |
-              (sum(rate(ceph_rgw_failed_req{job="rook-ceph-mgr"}[2h])))
+              (sum(rate(ceph_rgw_failed_req[2h])))
               /
-              (sum(rate(ceph_rgw_req{job="rook-ceph-mgr"}[2h])))
+              (sum(rate(ceph_rgw_req[2h])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-rgw-availability
@@ -187,9 +187,9 @@ serverFiles:
               sloth_window: 2h
             record: slo:sli_error:ratio_rate2h
           - expr: |
-              (sum(rate(ceph_rgw_failed_req{job="rook-ceph-mgr"}[6h])))
+              (sum(rate(ceph_rgw_failed_req[6h])))
               /
-              (sum(rate(ceph_rgw_req{job="rook-ceph-mgr"}[6h])))
+              (sum(rate(ceph_rgw_req[6h])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-rgw-availability
@@ -198,9 +198,9 @@ serverFiles:
               sloth_window: 6h
             record: slo:sli_error:ratio_rate6h
           - expr: |
-              (sum(rate(ceph_rgw_failed_req{job="rook-ceph-mgr"}[1d])))
+              (sum(rate(ceph_rgw_failed_req[1d])))
               /
-              (sum(rate(ceph_rgw_req{job="rook-ceph-mgr"}[1d])))
+              (sum(rate(ceph_rgw_req[1d])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-rgw-availability
@@ -209,9 +209,9 @@ serverFiles:
               sloth_window: 1d
             record: slo:sli_error:ratio_rate1d
           - expr: |
-              (sum(rate(ceph_rgw_failed_req{job="rook-ceph-mgr"}[3d])))
+              (sum(rate(ceph_rgw_failed_req[3d])))
               /
-              (sum(rate(ceph_rgw_req{job="rook-ceph-mgr"}[3d])))
+              (sum(rate(ceph_rgw_req[3d])))
             labels:
               lab: ceph-lab
               sloth_id: ceph-rgw-availability
