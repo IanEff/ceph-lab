@@ -38,9 +38,27 @@ if [ ! -f "$RESOLVER_FILE" ]; then
     echo "[dnsmasq] Created resolver: ${RESOLVER_FILE}"
 fi
 
+# A user-domain LaunchAgent (from a plain `brew services start dnsmasq`
+# run without sudo, e.g. pre-dating this script) fights the system-domain
+# LaunchDaemon below for port 53 — both register the same launchd label.
+# dnsmasq here must only ever run in the system domain, so tear out any
+# stray user-domain copy before (re)starting the real one.
+USER_AGENT="${HOME}/Library/LaunchAgents/homebrew.mxcl.dnsmasq.plist"
+if [ -f "$USER_AGENT" ]; then
+    echo "[dnsmasq] Removing stray user-domain LaunchAgent: ${USER_AGENT}"
+    launchctl bootout "gui/$(id -u)" "$USER_AGENT" 2>/dev/null || true
+    rm -f "$USER_AGENT"
+fi
+
 sudo brew services restart dnsmasq 2>/dev/null || \
     sudo launchctl kickstart -k system/homebrew.mxcl.dnsmasq 2>/dev/null || \
     echo "  [dnsmasq] Remember to restart dnsmasq manually."
+
+# mDNSResponder caches lookups (including negative/SERVFAIL results) made
+# during the dnsmasq restart window above and won't retry on its own —
+# this is the "DNS is flaky, needs kicking" symptom. Flush it every time.
+sudo dscacheutil -flushcache 2>/dev/null || true
+sudo killall -HUP mDNSResponder 2>/dev/null || true
 
 echo ""
 echo "  *.${DOMAIN} → ${GATEWAY_IP}  (dnsmasq ready)"

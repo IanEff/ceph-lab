@@ -9,4 +9,6 @@ if [ -f "$CONF_FILE" ]; then
     sudo rm -f "$CONF_FILE"
     echo "[dnsmasq] Removed ${CONF_FILE}"
     sudo brew services restart dnsmasq 2>/dev/null || true
+    sudo dscacheutil -flushcache 2>/dev/null || true
+    sudo killall -HUP mDNSResponder 2>/dev/null || true
 fi
