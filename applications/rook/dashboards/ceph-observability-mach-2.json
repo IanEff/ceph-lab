@@ -195,17 +195,32 @@
       "targets": [{ "expr": "rate(node_network_receive_bytes_total{device=~\"eth.*|en.*\"}[5m])", "legendFormat": "{{instance}}", "refId": "A" }]
     },
     {
+      "type": "timeseries",
+      "id": 12,
+      "title": "HPC MDS Reply Latency P99",
+      "description": "CephFS metadata server reply latency at the 99th percentile. Ported in from the retired elk-slo-dashboard component — the one panel there without an equivalent elsewhere in this dashboard.",
+      "gridPos": { "x": 0, "y": 22, "w": 12, "h": 8 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2, "fillOpacity": 10 }
+        }
+      },
+      "targets": [{ "expr": "histogram_quantile(0.99, rate(ceph_mds_reply_latency_bucket[5m]))", "legendFormat": "MDS Reply P99", "refId": "A" }]
+    },
+    {
       "type": "row",
       "id": 300,
       "title": "Row 3: \"Are we burning through our reliability budget?\" — the SLO/burn-rate layer",
-      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 1 }
+      "gridPos": { "x": 0, "y": 30, "w": 24, "h": 1 }
     },
     {
       "type": "stat",
       "id": 9,
       "title": "Error budget remaining — the clock",
-      "description": "SLO: 99.9% of reads < 100ms. Monthly allowance of badness. When it hits zero, you've blown the SLO.",
-      "gridPos": { "x": 0, "y": 23, "w": 8, "h": 4 },
+      "description": "SLO (Sloth-backed, sloth_id=ceph-osd-latency): 99% of writes < 50ms, 30-day period. Was read-latency (99.9%/100ms) before this SLO's Sloth cutover — a real semantic change, not a rename. When it hits zero, you've blown the SLO.",
+      "gridPos": { "x": 0, "y": 31, "w": 8, "h": 4 },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "colorMode": "background",
@@ -226,14 +241,14 @@
           }
         }
       },
-      "targets": [{ "expr": "1 - ((1 - (sum(rate(ceph_native_osd_op_r_latency_seconds_bucket{le=\"0.099999\"}[30d])) / sum(rate(ceph_native_osd_op_r_latency_seconds_count[30d])))) / 0.001)", "legendFormat": "Budget Remaining", "refId": "A" }]
+      "targets": [{ "expr": "slo:period_error_budget_remaining:ratio{sloth_id=\"ceph-osd-latency\"}", "legendFormat": "Budget Remaining", "refId": "A" }]
     },
     {
       "type": "stat",
       "id": 10,
       "title": "Fast burn rate — the page-me-now alert",
-      "description": "1-hour burn rate. Threshold at 14.4 means consuming 2% of monthly budget per hour. Above this: wake someone up.",
-      "gridPos": { "x": 8, "y": 23, "w": 8, "h": 4 },
+      "description": "1-hour burn rate (Sloth's slo:sli_error:ratio_rate1h, sloth_id=ceph-osd-latency). Threshold at 14.4 means consuming 2% of monthly budget per hour — objective-independent, unchanged by the read→write SLO cutover. Above this: wake someone up.",
+      "gridPos": { "x": 8, "y": 31, "w": 8, "h": 4 },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "colorMode": "background",
@@ -251,14 +266,14 @@
           }
         }
       },
-      "targets": [{ "expr": "((sum(rate(ceph_native_osd_op_r_latency_seconds_count[1h])) - sum(rate(ceph_native_osd_op_r_latency_seconds_bucket{le=\"0.099999\"}[1h]))) / sum(rate(ceph_native_osd_op_r_latency_seconds_count[1h]))) / 0.001", "legendFormat": "Burn Rate (1h)", "refId": "A" }]
+      "targets": [{ "expr": "slo:sli_error:ratio_rate1h{sloth_id=\"ceph-osd-latency\"} / (1 - 0.99)", "legendFormat": "Burn Rate (1h)", "refId": "A" }]
     },
     {
       "type": "stat",
       "id": 11,
       "title": "Slow burn rate — the ticket-me alert",
-      "description": "6-hour burn rate. Threshold at 6. You're not on fire but you're going to be.",
-      "gridPos": { "x": 16, "y": 23, "w": 8, "h": 4 },
+      "description": "6-hour burn rate (Sloth's slo:sli_error:ratio_rate6h, sloth_id=ceph-osd-latency). Threshold at 6. You're not on fire but you're going to be.",
+      "gridPos": { "x": 16, "y": 31, "w": 8, "h": 4 },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "colorMode": "background",
@@ -276,7 +291,7 @@
           }
         }
       },
-      "targets": [{ "expr": "((sum(rate(ceph_native_osd_op_r_latency_seconds_count[6h])) - sum(rate(ceph_native_osd_op_r_latency_seconds_bucket{le=\"0.099999\"}[6h]))) / sum(rate(ceph_native_osd_op_r_latency_seconds_count[6h]))) / 0.001", "legendFormat": "Burn Rate (6h)", "refId": "A" }]
+      "targets": [{ "expr": "slo:sli_error:ratio_rate6h{sloth_id=\"ceph-osd-latency\"} / (1 - 0.99)", "legendFormat": "Burn Rate (6h)", "refId": "A" }]
     }
   ]
 }
