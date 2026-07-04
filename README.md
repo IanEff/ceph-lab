@@ -74,6 +74,10 @@ cd ceph-lab
 # 2. One-time host setup (Lima networks, socket_vmnet)
 make setup
 
+# 2.5 (Optional) Configure passwordless sudo for local DNS and network management
+# This prevents password prompts when starting/stopping the environment
+make setup-sudoers
+
 # 3. Configure your environment
 cp .env.example .env
 # Edit .env — at minimum set:

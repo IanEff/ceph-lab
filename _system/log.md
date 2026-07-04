@@ -1,5 +1,14 @@
 # Operations Log
 
+## [2026-07-04] - Configure Passwordless Sudo (Opt-in)
+
+### Action
+- Added `just setup-sudoers` and `make setup-sudoers` recipes to `justfile` and `Makefile`.
+- Created helper script `provisioning/scripts/setup_host_sudoers.sh` to dynamically configure `/etc/sudoers.d/ceph-lab`.
+- Updated `provisioning/lima-setup.sh` to display instructions about `setup-sudoers` at completion.
+- Updated `README.md` to document the optional `make setup-sudoers` step in the Quick start.
+- Rewrote `provisioning/scripts/dnsmasq_teardown.sh` to search for dnsmasq configuration directories dynamically and properly remove the `/etc/resolver/ceph.lab` resolver file.
+
 ## [2026-07-03] - PR1.6: SLO Integrity Fixes
 
 ### Action

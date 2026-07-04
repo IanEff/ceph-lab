@@ -8,6 +8,10 @@ default:
 setup:
     provisioning/lima-setup.sh
 
+# configure passwordless sudo for Lima, dnsmasq, resolver, and mDNSResponder on the host
+setup-sudoers:
+    sudo provisioning/scripts/setup_host_sudoers.sh
+
 # provision and start all VMs (~10–20 min first run)
 up:
     provisioning/lima-up.sh

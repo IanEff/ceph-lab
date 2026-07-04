@@ -10,10 +10,13 @@
 #   make ssh           — open a shell on ceph-control
 #   make kubeconfig    — re-merge kubeconfig + SSH aliases after a restart
 
-.PHONY: setup up down destroy destroy-force ssh kubeconfig
+.PHONY: setup setup-sudoers up down destroy destroy-force ssh kubeconfig
 
 setup:
 	bash provisioning/lima-setup.sh
+
+setup-sudoers:
+	sudo bash provisioning/scripts/setup_host_sudoers.sh
 
 up:
 	bash provisioning/lima-up.sh
