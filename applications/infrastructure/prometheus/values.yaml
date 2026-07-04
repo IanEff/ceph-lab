@@ -15,17 +15,10 @@ server:
   persistentVolume:
     enabled: true
     size: 10Gi
-    storageClass: "" # uses cluster default (ceph-block)
+    storageClass: "local-path"
 
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-          - matchExpressions:
-              - key: kubernetes.io/hostname
-                operator: NotIn
-                values:
-                  - ceph-control
+  nodeSelector:
+    kubernetes.io/hostname: ceph-control
 
   resources:
     requests:
