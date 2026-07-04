@@ -8,7 +8,7 @@
 - Updated `provisioning/lima-setup.sh` to display instructions about `setup-sudoers` at completion.
 - Updated `README.md` to document the optional `make setup-sudoers` step in the Quick start.
 - Rewrote `provisioning/scripts/dnsmasq_teardown.sh` to search for dnsmasq configuration directories dynamically and properly remove the `/etc/resolver/ceph.lab` resolver file.
-- Modified `applications/infrastructure/prometheus/values.yaml` to pin `prometheus-server` to the control node `ceph-control` (via `nodeSelector`) and use `local-path` storage class to isolate Prometheus from OSD/worker nodes and Ceph-internal volume degradation during chaos runs.
+- Modified `applications/infrastructure/prometheus/values.yaml` to pin `prometheus-server` to the control node `lima-ceph-control` (via `nodeSelector`) and use `local-path` storage class to isolate Prometheus from OSD/worker nodes and Ceph-internal volume degradation during chaos runs.
 
 ## [2026-07-03] - PR1.6: SLO Integrity Fixes
 

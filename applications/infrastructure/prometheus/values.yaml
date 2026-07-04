@@ -18,7 +18,7 @@ server:
     storageClass: "local-path"
 
   nodeSelector:
-    kubernetes.io/hostname: ceph-control
+    kubernetes.io/hostname: lima-ceph-control
 
   resources:
     requests:
