@@ -1,5 +1,11 @@
 # Operations Log
 
+## [2026-07-05] - Query Lima VM Storage Location
+
+### Action
+- Queried current Lima VM directories via `limactl list`.
+- Confirmed virtual machine data is stored in `~/.lima/` (e.g., `~/.lima/ceph-control`, `~/.lima/ceph-node-1`, etc.).
+
 ## [2026-07-04] - Configure Passwordless Sudo (Opt-in)
 
 ### Action
