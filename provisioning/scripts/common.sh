@@ -110,6 +110,11 @@ cache_endpoint() {  # $1=port → echoes "      - http://HOST:PORT\n" or empty
     [ "$SANDBOX_CACHE_ENABLED" = "1" ] && [ -n "$SANDBOX_CACHE_HOST" ] \
         && cache_tcp_check "$SANDBOX_CACHE_HOST" "$port" \
         && printf '      - "http://%s:%s"\n' "$SANDBOX_CACHE_HOST" "$port"
+    # The condition above is expected to be false when the cache is off —
+    # that's not a failure. Without this, `set -e` aborts the whole script
+    # at `DOCKERHUB_CACHE=$(cache_endpoint ...)` the moment the chain
+    # short-circuits (verified on the VM's real bash 5.2, not just locally).
+    return 0
 }
 DOCKERHUB_CACHE=$(cache_endpoint "$SANDBOX_CACHE_REGISTRY_DOCKERHUB_PORT")
 K8S_CACHE=$(cache_endpoint "$SANDBOX_CACHE_REGISTRY_K8S_PORT")
@@ -118,6 +123,41 @@ QUAY_CACHE=$(cache_endpoint "$SANDBOX_CACHE_REGISTRY_QUAY_PORT")
 
 if [ -n "${DOCKERHUB_CACHE}${K8S_CACHE}${GHCR_CACHE}${QUAY_CACHE}" ]; then
     echo "[CACHE] Pull-through cache reachable; prepending local mirror endpoints."
+fi
+
+# ── Optional local Tilt dev registry (thump's dev loop, not ceph-lab's) ────
+# When SANDBOX_DEV_REGISTRY_ENABLED=1, trust an insecure registry on the Mac
+# host (reachable over the ceph-lab socket_vmnet subnet at its gateway IP,
+# 192.168.56.1 by default — the Mac, not a lab node). This lets `tilt up` in
+# the thump repo push/pull images without a real registry. Off by default;
+# additive to the mirrors below, never touches them. See thump's Tiltfile +
+# phase2-ws2-deploy-guide.md Stage 3 for why this exists. Folded into the
+# same `mirrors:`/`configs:` document below — a second top-level `mirrors:`
+# key would just shadow the first in YAML, silently dropping every mirror
+# above it.
+SANDBOX_DEV_REGISTRY_ENABLED="${SANDBOX_DEV_REGISTRY_ENABLED:-0}"
+SANDBOX_DEV_REGISTRY_HOST="${SANDBOX_DEV_REGISTRY_HOST:-192.168.56.1}"
+SANDBOX_DEV_REGISTRY_PORT="${SANDBOX_DEV_REGISTRY_PORT:-5005}"
+DEV_REGISTRY_MIRROR=""
+DEV_REGISTRY_CONFIGS=""
+if [ "$SANDBOX_DEV_REGISTRY_ENABLED" = "1" ]; then
+    echo "[DEV] Trusting local Tilt registry at ${SANDBOX_DEV_REGISTRY_HOST}:${SANDBOX_DEV_REGISTRY_PORT}"
+    DEV_REGISTRY_MIRROR=$(cat <<EOF2
+  "${SANDBOX_DEV_REGISTRY_HOST}:${SANDBOX_DEV_REGISTRY_PORT}":
+    endpoint:
+      - "http://${SANDBOX_DEV_REGISTRY_HOST}:${SANDBOX_DEV_REGISTRY_PORT}"
+EOF2
+)
+    # configs.tls.insecure_skip_verify only covers self-signed-cert HTTPS;
+    # the mirror endpoint's explicit http:// scheme above is what actually
+    # makes containerd speak plaintext instead of defaulting to HTTPS.
+    DEV_REGISTRY_CONFIGS=$(cat <<EOF2
+configs:
+  "${SANDBOX_DEV_REGISTRY_HOST}:${SANDBOX_DEV_REGISTRY_PORT}":
+    tls:
+      insecure_skip_verify: true
+EOF2
+)
 fi
 
 cat > /etc/rancher/k3s/registries.yaml <<EOF
@@ -139,6 +179,8 @@ ${GHCR_CACHE}      - "https://ghcr.io"
     endpoint:
 ${QUAY_CACHE}      - "https://quay.io"
       - "https://registry-1.docker.io"
+${DEV_REGISTRY_MIRROR}
+${DEV_REGISTRY_CONFIGS}
 EOF
 
 echo "[5] /etc/hosts — cluster node entries"
