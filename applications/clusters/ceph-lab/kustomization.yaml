@@ -14,3 +14,4 @@ resources:
   - rook-operator.yaml
   - rook-cluster.yaml
   - rook-set.yaml
+  # - thump.yaml
