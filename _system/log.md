@@ -1,5 +1,10 @@
 # Operations Log
 
+## [2026-07-05] - Time Machine Exclusions Advice
+
+### Action
+- Provided recommendations for developer-related Time Machine exclusions (virtual machines, caches, and package directories) to optimize system performance and reduce backup bloat.
+
 ## [2026-07-05] - Query Lima VM Storage Location
 
 ### Action
