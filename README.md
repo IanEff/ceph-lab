@@ -44,7 +44,7 @@ A fully-gitopsed Rook/Ceph playground on k3s - a sandbox to play around with cep
      │  ceph-node-1/2/3  :61/:62/:63          │
      │  k3s agents + Ceph OSDs                │
      │  3 vCPU / 8 GiB each                   │
-     │  /dev/vdc + /dev/vdd (10 GiB, raw)      │
+     │  /dev/vdc + /dev/vdd (5 GiB, raw)       │
      └────────────────────────────────────────┘
                │
      ┌─────────▼──────────────────────────────┐
@@ -202,7 +202,8 @@ All tuneable via `.env` (see `.env.example` for descriptions):
 | `ROOK_VERSION` | v1.19.1 | Rook Helm chart version |
 | `CILIUM_VERSION` | 1.19.3 | Cilium Helm chart version |
 | `GATEWAY_API_VERSION` | v1.5.1 | Gateway API CRD version |
-| `ARGOCD_VERSION` | stable | ArgoCD install channel or tag |
+| `ARGOCD_VERSION` | v3.5.1 | ArgoCD install tag (pinned deliberately — bump by hand, don't float `stable`) |
+| `SANDBOX_CACHE_ENABLED` | 1 | Local apt + OCI pull-through cache (`task cache-up`/`cache-down`); falls through silently on miss |
 
 ---
 
@@ -238,5 +239,5 @@ See also:
 - **PostSync health gate** — `rook-cluster` has a PostSync Job that polls `CephCluster` until `state=Connected` and `health=HEALTH_OK` before ArgoCD advances to wave 30.
 - **Hubble metrics** are disabled at bootstrap and should be enabled once Prometheus is synced. They provide L7 flow data and blast-radius metrics.
 - **Standalone Prometheus, no Operator** — We run the community `prometheus` and `grafana` charts, not `kube-prometheus-stack`. Since there is no operator, `PrometheusRule` and `ServiceMonitor` CRs are not consumed by the cluster.
-- **Sloth SLOs at build time** — Because there's no operator, Sloth is run as a build-time step (`just gen-slos`) to render rules directly into Prometheus `serverFiles`, rather than running as a live controller.
+- **Sloth SLOs at build time** — Because there's no operator, Sloth is run as a build-time step (`task gen-slos`) to render rules directly into Prometheus `serverFiles`, rather than running as a live controller.
 - **Topology Catalog** — A static `catalog-info.yaml` is deployed as a ConfigMap to map out Ceph and infrastructure dependencies.
