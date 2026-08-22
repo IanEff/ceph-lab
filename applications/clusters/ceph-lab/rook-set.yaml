@@ -32,3 +32,15 @@ spec:
         syncOptions:
           - CreateNamespace=true
           - ServerSideApply=true
+        # ArgoCD's default retry budget gives up permanently after a handful
+        # of attempts, which loses races against CRD-registration during a
+        # cold multi-wave bootstrap (an Application whose CRDs haven't landed
+        # yet fails its first sync and then just sits there). selfHeal:true
+        # alone doesn't help — it only corrects drift on an already-synced
+        # app, it doesn't retry an abandoned initial sync.
+        retry:
+          limit: 10
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 1m

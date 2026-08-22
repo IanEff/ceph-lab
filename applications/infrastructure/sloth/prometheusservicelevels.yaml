@@ -3,9 +3,9 @@
 # reads no monitoring.coreos.com CRs, so a live Sloth controller generating
 # PrometheusRule CRs nobody consumes was pure overhead. This CRD-shaped YAML
 # is now only an input to `sloth generate` (provisioning/scripts/gen_slos.sh
-# / `just gen-slos`), which renders it to plain rule groups embedded in
+# / `task gen-slos`), which renders it to plain rule groups embedded in
 # applications/infrastructure/prometheus/values.yaml. Edit this file, run
-# `just gen-slos`, commit both.
+# `task gen-slos`, commit both.
 #
 # sloth_id is NOT metadata.name — Sloth computes it as "{spec.service}-{slo.name}"
 # (confirmed against sloth/internal/storage/io/k8s_sloth.go). service/name below

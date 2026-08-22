@@ -1,0 +1,80 @@
+# ceph-lab — local pull-through cache (apt-cacher-ng + OCI registry mirrors)
+#
+# provisioning/scripts/common.sh has always known how to *use* this cache
+# (SANDBOX_CACHE_ENABLED=1, probed via a plain TCP check with a silent
+# fall-through to the public registries on miss) — this compose file is the
+# host-side half that was never actually built, so the guest-side logic sat
+# permanently dark. Bind to 0.0.0.0 so the ceph-lab socket_vmnet gateway
+# (192.168.56.1, the Mac's IP on that host-only segment) can reach it from
+# the Lima VMs; a miss here costs nothing beyond the TCP probe timeout.
+#
+# Ports match provisioning/provision.env / .env.example exactly:
+#   3142 — apt-cacher-ng (Ubuntu package cache)
+#   5001 — docker.io mirror
+#   5002 — registry.k8s.io mirror
+#   5003 — ghcr.io mirror
+#   5004 — quay.io mirror
+#
+# Start/stop via `task cache-up` / `task cache-down`, not docker compose
+# directly, so the .env values stay the single source of truth for ports.
+
+services:
+  apt-cacher-ng:
+    image: sameersbn/apt-cacher-ng:latest
+    container_name: ceph-lab-apt-cacher-ng
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:3142:3142"
+    volumes:
+      - apt-cacher-ng-data:/var/cache/apt-cacher-ng
+
+  registry-mirror-dockerhub:
+    image: registry:2
+    container_name: ceph-lab-registry-mirror-dockerhub
+    restart: unless-stopped
+    environment:
+      REGISTRY_PROXY_REMOTEURL: https://registry-1.docker.io
+    ports:
+      - "0.0.0.0:5001:5000"
+    volumes:
+      - registry-mirror-dockerhub-data:/var/lib/registry
+
+  registry-mirror-k8s:
+    image: registry:2
+    container_name: ceph-lab-registry-mirror-k8s
+    restart: unless-stopped
+    environment:
+      REGISTRY_PROXY_REMOTEURL: https://registry.k8s.io
+    ports:
+      - "0.0.0.0:5002:5000"
+    volumes:
+      - registry-mirror-k8s-data:/var/lib/registry
+
+  registry-mirror-ghcr:
+    image: registry:2
+    container_name: ceph-lab-registry-mirror-ghcr
+    restart: unless-stopped
+    environment:
+      REGISTRY_PROXY_REMOTEURL: https://ghcr.io
+    ports:
+      - "0.0.0.0:5003:5000"
+    volumes:
+      - registry-mirror-ghcr-data:/var/lib/registry
+
+  registry-mirror-quay:
+    image: registry:2
+    container_name: ceph-lab-registry-mirror-quay
+    restart: unless-stopped
+    environment:
+      REGISTRY_PROXY_REMOTEURL: https://quay.io
+    ports:
+      - "0.0.0.0:5004:5000"
+    volumes:
+      - registry-mirror-quay-data:/var/lib/registry
+
+volumes:
+  apt-cacher-ng-data:
+  registry-mirror-dockerhub-data:
+  registry-mirror-k8s-data:
+  registry-mirror-ghcr-data:
+  registry-mirror-quay-data:

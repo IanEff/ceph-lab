@@ -41,13 +41,13 @@ yq eval-all '[.spec.groups[]] as $g ireduce ([]; . + $g) | {"groups": .}' \
 # siblings of serverFiles.prometheus.yml (2-space indent already used there).
 {
     echo "  # Source: applications/infrastructure/sloth/prometheusservicelevels.yaml"
-    echo "  # DO NOT EDIT BY HAND — run \`just gen-slos\` after changing the source spec."
+    echo "  # DO NOT EDIT BY HAND — run \`task gen-slos\` after changing the source spec."
     echo "  recording_rules.yml:"
     sed 's/^/    /' "$tmpdir/recording_rules.yml"
 } > "$tmpdir/recording_block.yml"
 {
     echo "  # Source: applications/infrastructure/sloth/prometheusservicelevels.yaml"
-    echo "  # DO NOT EDIT BY HAND — run \`just gen-slos\` after changing the source spec."
+    echo "  # DO NOT EDIT BY HAND — run \`task gen-slos\` after changing the source spec."
     echo "  alerting_rules.yml:"
     sed 's/^/    /' "$tmpdir/alerting_rules.yml"
 } > "$tmpdir/alerting_block.yml"
@@ -64,12 +64,12 @@ splice_block() {
 }
 
 splice_block \
-    "  # --- BEGIN sloth-generated recording rules (regenerate: just gen-slos) ---" \
+    "  # --- BEGIN sloth-generated recording rules (regenerate: task gen-slos) ---" \
     "  # --- END sloth-generated recording rules ---" \
     "$tmpdir/recording_block.yml"
 
 splice_block \
-    "  # --- BEGIN sloth-generated alerting rules (regenerate: just gen-slos) ---" \
+    "  # --- BEGIN sloth-generated alerting rules (regenerate: task gen-slos) ---" \
     "  # --- END sloth-generated alerting rules ---" \
     "$tmpdir/alerting_block.yml"
 

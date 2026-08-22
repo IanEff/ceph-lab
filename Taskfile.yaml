@@ -1,0 +1,81 @@
+version: "3"
+
+# ceph-lab lifecycle wrapper. `task` or `task --list` lists tasks.
+
+tasks:
+  default:
+    desc: List available tasks
+    silent: true
+    cmds: [task --list]
+
+  setup:
+    desc: One-time host prerequisites (Lima, socket_vmnet, network config)
+    cmds: [provisioning/lima-setup.sh]
+
+  setup-sudoers:
+    desc: Configure passwordless sudo for Lima, dnsmasq, resolver, and mDNSResponder on the host
+    cmds: [sudo provisioning/scripts/setup_host_sudoers.sh]
+
+  up:
+    desc: Provision and start all VMs (~10-20 min first run)
+    cmds: [provisioning/lima-up.sh]
+
+  down:
+    desc: Stop VMs and preserve state
+    cmds: [provisioning/lima-down.sh]
+
+  destroy:
+    desc: "Permanently delete all VMs and disks (prompts unless FORCE=1)"
+    vars:
+      FORCE: '{{.FORCE | default "0"}}'
+    cmds:
+      - |
+        set -euo pipefail
+        if [ "{{.FORCE}}" != "1" ]; then
+          read -r -p "Permanently delete all VMs and disks? [y/N] " ans
+          case "$ans" in
+            y|Y) ;;
+            *) echo "Aborted."; exit 1 ;;
+          esac
+        fi
+        provisioning/lima-destroy.sh -f
+
+  ssh:
+    desc: Open a shell on ceph-control
+    cmds: [limactl shell ceph-control]
+
+  kubeconfig:
+    desc: Merge kubeconfig + SSH aliases after a restart
+    cmds: [python3 provisioning/scripts/manage_k8s_config.py add]
+
+  gen-slos:
+    desc: Regenerate Prometheus rule groups from the Sloth SLO specs (requires sloth-cli, yq)
+    cmds: [provisioning/scripts/gen_slos.sh]
+
+  boot-timeline:
+    desc: "Time every ArgoCD Application reaching Healthy from cold boot; run alongside `task up`"
+    cmds: [python3 provisioning/scripts/boot_timeline.py]
+
+  cache-up:
+    desc: Start the local apt-cacher-ng + OCI registry mirror cache (see .env.example)
+    cmds: [provisioning/scripts/cache_up.sh]
+
+  cache-down:
+    desc: Stop the local pull-through cache (cached data is preserved)
+    cmds: [provisioning/scripts/cache_down.sh]
+
+  bake-image:
+    desc: "Bake a Lima golden image (packages + container images pre-cached) — used automatically by `task up` once built"
+    cmds: [provisioning/scripts/build_golden_image.sh]
+
+  list-images:
+    desc: List container images the GitOps tree declares (used by bake-image)
+    cmds: [python3 provisioning/scripts/image_manifest.py --list]
+
+  images:
+    desc: List built golden images (active + archived)
+    cmds: [provisioning/scripts/manage_golden_images.sh list]
+
+  prune-images:
+    desc: Delete old archived golden images, keeping the newest per architecture
+    cmds: [provisioning/scripts/manage_golden_images.sh prune]

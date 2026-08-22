@@ -1,5 +1,14 @@
-# Helm chart caches (built by kustomize --enable-helm during local bootstrap)
-applications/**/charts/
+# NOTE: applications/**/charts/ used to be gitignored here ("built by kustomize
+# --enable-helm during local bootstrap") — that's now backwards. Five slow-fetching
+# charts (rook-ceph, grafana, loki, promtail, prometheus-operator-crds) are
+# deliberately vendored and committed so the repo-server never needs a live network
+# round-trip to render them; kustomize reuses a local chart dir instead of
+# `helm pull`ing on every sync. See applications/rook/operator/charts/,
+# applications/infrastructure/{grafana,loki,promtail,prometheus-operator-crds}/charts/.
+# Do not re-add a blanket ignore here — that would silently drop them from git again.
+
+# go-task local cache/checksum dir
+.task/
 
 # Local environment — never commit real credentials
 .env

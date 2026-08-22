@@ -45,6 +45,16 @@ echo "  ceph-lab — ArgoCD bootstrap              "
 echo "  Repo: ${GITOPS_REPO_URL}                 "
 echo "══════════════════════════════════════════"
 
+echo "[0a] Installing argocd CLI (${ARGOCD_VERSION}) in the background — nothing"
+echo "     downstream needs the CLI binary itself, only kubectl access."
+(
+    ARCH=$(dpkg --print-architecture)
+    curl -fsSL -o /usr/local/bin/argocd \
+        "https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_VERSION}/argocd-linux-${ARCH}" \
+        && chmod +x /usr/local/bin/argocd \
+        && echo "[0a] argocd CLI installed."
+) > /var/log/argocd-cli-install.log 2>&1 &
+
 echo "[0] Pre-bootstrap Cilium Gateway resources (LBIPPool, L2Policy, Gateway, HTTPRoutes)"
 echo "    This makes 192.168.56.200 reachable before ArgoCD reconciles wave -10."
 CILIUM_APP=/ceph-lab/applications/infrastructure/cilium
@@ -139,18 +149,19 @@ find /ceph-lab/applications/clusters /ceph-lab/cluster-bootstrap \
     -type f -name "*.yaml" \
     -exec sed -i "s|GITOPS_REPO_URL|${GITOPS_REPO_URL}|g" {} +
 
+echo "[5a] Pre-bootstrap Prometheus Operator CRDs"
+# ServiceMonitor/PrometheusRule/PodMonitor CRDs so the earliest waves (cilium's
+# hostPort ServiceMonitor, rook-operator's monitoring.enabled) don't hit a
+# CRD-not-registered race against ArgoCD's own reconciliation of this same
+# Application later in the tree. Same fix thump-test landed (commit 3e1f574).
+kubectl kustomize /ceph-lab/applications/infrastructure/prometheus-operator-crds --enable-helm \
+    | kubectl apply --server-side --force-conflicts -f -
+
 echo "[5b] Apply root Application (seeds entire GitOps tree)"
 kubectl apply -f /ceph-lab/cluster-bootstrap/bootstrap/root-app.yaml
 
-echo "[6] Install argocd CLI"
-ARGOCD_CLI_VERSION=$(curl -sL \
-    https://api.github.com/repos/argoproj/argo-cd/releases/latest \
-    | grep '"tag_name"' | cut -d'"' -f4)
-ARCH=$(dpkg --print-architecture)
-curl -fsSL -o /usr/local/bin/argocd \
-    "https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_CLI_VERSION}/argocd-linux-${ARCH}"
-chmod +x /usr/local/bin/argocd
-
+echo "[6] Waiting for backgrounded argocd CLI install to finish..."
+wait
 echo ""
 echo "✓ ArgoCD is bootstrapped!"
 echo ""

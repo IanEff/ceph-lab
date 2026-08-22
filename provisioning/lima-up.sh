@@ -4,11 +4,18 @@
 #
 # Sequence:
 #   1. Preflight  — check prereqs and .env before touching any VMs
-#   2. Disks      — pre-create all Lima disks (idempotent)
-#   3. VMs        — all four VMs started in parallel; Lima runs provision
+#   2. Cache      — best-effort local pull-through cache (SANDBOX_CACHE_ENABLED)
+#   3. Disks      — pre-create all Lima disks (idempotent)
+#   4. VMs        — all four VMs started in parallel; Lima runs provision
 #                   scripts internally and blocks until probes pass
-#   4. Post-up    — merge kubeconfig + SSH, configure dnsmasq
-#   5. ArgoCD     — bootstrap from the Mac host once the full cluster is Ready
+#   5. Post-up    — merge kubeconfig + SSH, configure dnsmasq (control-plane only)
+#   6. ArgoCD     — bootstrap from the Mac host as soon as the control plane
+#                   is Ready, overlapping with worker provisioning — ArgoCD's
+#                   early sync waves (gateway-api, cilium, cert-manager,
+#                   prometheus, rook-operator...) don't need worker nodes;
+#                   only wave 25 (rook-cluster) does, and workers are done
+#                   provisioning well before ArgoCD's reconciler gets there.
+#   7. Wait       — block on worker provisioning finishing before reporting Ready
 #
 # Usage:
 #   make up
@@ -42,6 +49,7 @@ CONFIGURE_DNSMASQ="${SANDBOX_CONFIGURE_DNSMASQ:-1}"
 DNS_DOMAIN="${SANDBOX_DNS_DOMAIN:-ceph.lab}"
 GATEWAY_LB_IP="${SANDBOX_GATEWAY_LB_IP:-192.168.56.200}"
 INSTALL_ARGOCD="${SANDBOX_INSTALL_ARGOCD:-1}"
+CACHE_ENABLED="${SANDBOX_CACHE_ENABLED:-0}"
 
 # ── Preflight ─────────────────────────────────────────────────────────────────
 command -v limactl >/dev/null 2>&1 || error "limactl not found. Run: make setup"
@@ -50,6 +58,15 @@ if [ "${INSTALL_ARGOCD}" = "1" ] && [ -z "${GITOPS_REPO_URL:-}" ]; then
     error "GITOPS_REPO_URL is not set.
   Copy .env.example to .env, set GITOPS_REPO_URL, and add your deploy key before
   running make up.  To skip ArgoCD bootstrap, set SANDBOX_INSTALL_ARGOCD=0 in .env."
+fi
+
+# ── Pull-through cache (best-effort) ────────────────────────────────────────
+# Started before any VM so the very first apt/image pull can hit it. common.sh
+# probes with a TCP check and falls through silently on miss, so this never
+# blocks `up` even if docker isn't running.
+if [ "${CACHE_ENABLED}" = "1" ]; then
+    step "Starting local pull-through cache..."
+    bash "${SCRIPT_DIR}/scripts/cache_up.sh" || warn "Pull-through cache failed to start; continuing without it."
 fi
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -82,6 +99,28 @@ ensure_disk() {
     fi
 }
 
+# ── Golden image (best-effort) ──────────────────────────────────────────────
+# provisioning/scripts/build_golden_image.sh (`task bake-image`) produces a
+# pre-baked disk at ~/.lima-images/ceph-lab-golden-<arch>.qcow2 with apt
+# packages already installed and every GitOps-tree container image already
+# pulled into containerd. Decided here in bash, not left to Lima's own
+# multi-candidate images: fallback — only ever hands limactl a location we've
+# already confirmed exists, so a repo clone that's never baked an image
+# behaves exactly as it does today (stock cloud image, no config change).
+GOLDEN_IMAGE_ARGS=()
+case "$(uname -m)" in
+    arm64) GOLDEN_ARCH="aarch64"; GOLDEN_IMAGE_IDX=0 ;;
+    x86_64) GOLDEN_ARCH="x86_64"; GOLDEN_IMAGE_IDX=1 ;;
+    *) GOLDEN_ARCH=""; GOLDEN_IMAGE_IDX="" ;;
+esac
+if [ -n "${GOLDEN_ARCH}" ]; then
+    GOLDEN_IMAGE_PATH="${HOME}/.lima-images/ceph-lab-golden-${GOLDEN_ARCH}.qcow2"
+    if [ -f "${GOLDEN_IMAGE_PATH}" ]; then
+        info "Using golden image: ${GOLDEN_IMAGE_PATH} (run 'task bake-image' to refresh)"
+        GOLDEN_IMAGE_ARGS=(--set ".images[${GOLDEN_IMAGE_IDX}].location = \"${GOLDEN_IMAGE_PATH}\"")
+    fi
+fi
+
 # ── Start control plane ───────────────────────────────────────────────────────
 step "Ensuring ceph-control disks exist..."
 ensure_disk "ceph-control-rancher" "20GiB"
@@ -96,6 +135,7 @@ case "${CP_STATUS}" in
         step "Creating ceph-control (baking in params)..."
         limactl create -y --name=ceph-control \
             --set ".param.ProjectRoot = \"${PROJECT_ROOT}\"" \
+            "${GOLDEN_IMAGE_ARGS[@]}" \
             "${SCRIPT_DIR}/lima/ceph-control.yaml"
         step "Starting ceph-control in background (provision runs inside Lima)..."
         limactl start -y --timeout 35m ceph-control &
@@ -133,6 +173,7 @@ for i in $(seq 1 "${NUM_NODES}"); do
                 --set ".additionalDisks[0].name = \"${NODE_NAME}-rancher\"" \
                 --set ".additionalDisks[1].name = \"${NODE_NAME}-osd-1\"" \
                 --set ".additionalDisks[2].name = \"${NODE_NAME}-osd-2\"" \
+                "${GOLDEN_IMAGE_ARGS[@]}" \
                 "${SCRIPT_DIR}/lima/ceph-node.yaml"
             step "Starting ${NODE_NAME} in background..."
             limactl start -y --timeout 30m "${NODE_NAME}" &
@@ -149,20 +190,20 @@ for i in $(seq 1 "${NUM_NODES}"); do
     esac
 done
 
-# ── Wait for all VMs ──────────────────────────────────────────────────────────
-ALL_PIDS=()
-[ -n "${CP_PID:-}" ] && ALL_PIDS+=("${CP_PID}")
-ALL_PIDS+=("${WORKER_PIDS[@]}")
-
-if [ "${#ALL_PIDS[@]}" -gt 0 ]; then
-    step "Waiting for ${#ALL_PIDS[@]} VM(s) to finish provisioning (probes included)..."
-    for pid in "${ALL_PIDS[@]}"; do
-        wait "${pid}" || error "A VM provisioning step failed (pid ${pid}). Check: limactl list"
-    done
-    info "All VMs are up and probes passed."
+# ── Wait for control plane only ─────────────────────────────────────────────
+# Workers keep provisioning in the background (already-forked `limactl start`
+# processes) while we get ArgoCD reconciling against the control plane —
+# ArgoCD's own early sync waves don't need them yet. Workers are `wait`ed on
+# below, after kicking off the ArgoCD bootstrap, not before.
+if [ -n "${CP_PID:-}" ]; then
+    step "Waiting for ceph-control to finish provisioning (probe included)..."
+    wait "${CP_PID}" || error "ceph-control provisioning failed (pid ${CP_PID}). Check: limactl list"
+    info "ceph-control is up and its probe passed."
 fi
 
 # ── Post-up: kubeconfig + SSH aliases ────────────────────────────────────────
+# Only needs the control plane — Lima's static (non-DHCP) IPs mean worker SSH
+# aliases resolve correctly even while those VMs are still mid-boot.
 step "Merging kubeconfig and SSH config on host..."
 python3 "${PROJECT_ROOT}/provisioning/scripts/manage_k8s_config.py" add
 
@@ -176,12 +217,23 @@ fi
 
 # ── ArgoCD bootstrap ──────────────────────────────────────────────────────────
 # Runs from the Mac host via limactl shell — no Lima provision timeout pressure,
-# full cluster is available, errors surface directly to your terminal.
+# control plane is available, errors surface directly to your terminal. Kicked
+# off here, overlapping with worker provisioning still running in the
+# background, instead of waiting for every worker to be Ready first.
 if [ "${INSTALL_ARGOCD}" = "1" ]; then
     step "Bootstrapping ArgoCD (repo: ${GITOPS_REPO_URL})..."
     limactl shell ceph-control -- \
         sudo bash /ceph-lab/provisioning/scripts/install_argocd.sh
     info "ArgoCD bootstrapped."
+fi
+
+# ── Wait for workers ─────────────────────────────────────────────────────────
+if [ "${#WORKER_PIDS[@]}" -gt 0 ]; then
+    step "Waiting for ${#WORKER_PIDS[@]} worker node(s) to finish provisioning (probes included)..."
+    for pid in "${WORKER_PIDS[@]}"; do
+        wait "${pid}" || error "A worker provisioning step failed (pid ${pid}). Check: limactl list"
+    done
+    info "All worker nodes are up and probes passed."
 fi
 
 info ""

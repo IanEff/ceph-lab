@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # ceph-lab — setup_host_sudoers.sh
 # One-time host setup for passwordless sudo rules.
-# Must be run as root (usually via `sudo provisioning/scripts/setup_host_sudoers.sh` or `just setup-sudoers`).
+# Must be run as root (usually via `sudo provisioning/scripts/setup_host_sudoers.sh` or `task setup-sudoers`).
 
 set -euo pipefail
 
 # Ensure run as root
 if [ "$EUID" -ne 0 ]; then
     echo "Error: This script must be run as root (via sudo)." >&2
-    echo "Please run: just setup-sudoers" >&2
+    echo "Please run: task setup-sudoers" >&2
     exit 1
 fi
 
@@ -57,6 +57,13 @@ cat << EOF >> "$TEMP_FILE"
 %admin ALL=(root) NOPASSWD: /usr/bin/tee /etc/resolver/*
 %admin ALL=(root) NOPASSWD: /bin/rm -f /etc/resolver/*
 %admin ALL=(root) NOPASSWD: /usr/bin/security add-trusted-cert *
+
+# dnsmasq config cleanup rules
+%admin ALL=(root) NOPASSWD: /bin/rm -f /opt/homebrew/etc/dnsmasq.d/ceph-lab.conf
+%admin ALL=(root) NOPASSWD: /bin/rm -f /usr/local/etc/dnsmasq.d/ceph-lab.conf
+
+# dnsmasq launchctl fallback
+%admin ALL=(root) NOPASSWD: /bin/launchctl kickstart -k system/homebrew.mxcl.dnsmasq
 EOF
 
 # 3. Validate with visudo

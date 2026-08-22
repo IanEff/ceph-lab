@@ -109,9 +109,9 @@ serverFiles:
           - target_label: job
             replacement: argocd-metrics
 
-  # --- BEGIN sloth-generated recording rules (regenerate: just gen-slos) ---
+  # --- BEGIN sloth-generated recording rules (regenerate: task gen-slos) ---
   # Source: applications/infrastructure/sloth/prometheusservicelevels.yaml
-  # DO NOT EDIT BY HAND — run `just gen-slos` after changing the source spec.
+  # DO NOT EDIT BY HAND — run `task gen-slos` after changing the source spec.
   recording_rules.yml:
     groups:
       - name: sloth-slo-sli-recordings-ceph-rgw-availability
@@ -677,9 +677,9 @@ serverFiles:
               sloth_version: 0.16.0
             record: sloth_slo_info
   # --- END sloth-generated recording rules ---
-  # --- BEGIN sloth-generated alerting rules (regenerate: just gen-slos) ---
+  # --- BEGIN sloth-generated alerting rules (regenerate: task gen-slos) ---
   # Source: applications/infrastructure/sloth/prometheusservicelevels.yaml
-  # DO NOT EDIT BY HAND — run `just gen-slos` after changing the source spec.
+  # DO NOT EDIT BY HAND — run `task gen-slos` after changing the source spec.
   alerting_rules.yml:
     groups:
       - name: sloth-slo-alerts-ceph-rgw-availability

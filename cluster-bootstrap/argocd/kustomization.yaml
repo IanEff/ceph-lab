@@ -2,8 +2,10 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: argocd
 
+# Pinned to the same ARGOCD_VERSION as provisioning/provision.env — bump both
+# together, deliberately, not by drifting back to a floating `stable` ref.
 resources:
-  - https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v3.5.1/manifests/install.yaml
   - namespace.yaml
 
 patches:
@@ -31,20 +33,47 @@ patches:
         path: /data/kustomize.buildOptions
         value: "--load-restrictor LoadRestrictionsNone --enable-helm"
 
-  # Resource limits for the worker nodes (control plane is memory-constrained)
+  # Concurrency: stock defaults (20 status-processors / 10 operation-processors)
+  # are sized for ArgoCD's general case, not a multi-wave cold bootstrap syncing
+  # a dozen-plus Applications at once. argocd-cmd-params-cm ships as an empty
+  # ConfigMap in the base install.yaml specifically so this can be tuned — the
+  # application-controller reads these as optional env vars, falling back to
+  # built-in defaults when a key is absent. This is the supported knob, not a
+  # container-args patch.
   - target:
-      kind: Deployment
+      kind: ConfigMap
+      name: argocd-cmd-params-cm
+    patch: |-
+      - op: add
+        path: /data
+        value:
+          controller.status.processors: "40"
+          controller.operation.processors: "25"
+          controller.k8s.client.qps: "100"
+          controller.k8s.client.burst: "150"
+          reposerver.parallelism.limit: "20"
+
+  # Resource limits for the worker nodes (control plane is memory-constrained).
+  # NOTE: argocd-application-controller ships upstream as a StatefulSet, not a
+  # Deployment (unlike server/repo-server/redis, which are Deployments) — this
+  # patch and the node-affinity one below previously targeted `kind: Deployment`
+  # and so silently never applied: kustomize skips a patch whose target kind
+  # doesn't match rather than erroring. Bumped alongside the concurrency
+  # increase above since more concurrent processors means more concurrent
+  # in-flight work.
+  - target:
+      kind: StatefulSet
       name: argocd-application-controller
     patch: |-
       - op: add
         path: /spec/template/spec/containers/0/resources
         value:
           requests:
-            cpu: 250m
-            memory: 512Mi
+            cpu: 500m
+            memory: 768Mi
           limits:
-            cpu: 1000m
-            memory: 1Gi
+            cpu: 2000m
+            memory: 1536Mi
 
   - target:
       kind: Deployment
@@ -88,9 +117,10 @@ patches:
             cpu: 200m
             memory: 128Mi
 
-  # Prefer worker nodes — control plane (ceph-control) is already under load
+  # Prefer worker nodes — control plane (ceph-control) is already under load.
+  # Same StatefulSet-not-Deployment kind fix as the resource-limits patch above.
   - target:
-      kind: Deployment
+      kind: StatefulSet
       name: argocd-application-controller
     patch: |-
       - op: add

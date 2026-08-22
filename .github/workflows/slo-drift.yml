@@ -1,7 +1,7 @@
 name: SLO rule drift check
 
 # Fails if applications/infrastructure/sloth/prometheusservicelevels.yaml was
-# edited without re-running `just gen-slos` — the standalone `prometheus`
+# edited without re-running `task gen-slos` — the standalone `prometheus`
 # chart used in this lab reads no PrometheusRule CRs, so the rendered rule
 # groups embedded in applications/infrastructure/prometheus/values.yaml are
 # the only copy Prometheus ever loads. See provisioning/scripts/gen_slos.sh.
@@ -32,6 +32,6 @@ jobs:
         run: |
           ./provisioning/scripts/gen_slos.sh
           git diff --exit-code -- applications/infrastructure/prometheus/values.yaml || {
-            echo "::error::applications/infrastructure/prometheus/values.yaml is stale — run 'just gen-slos' and commit the result."
+            echo "::error::applications/infrastructure/prometheus/values.yaml is stale — run 'task gen-slos' and commit the result."
             exit 1
           }
